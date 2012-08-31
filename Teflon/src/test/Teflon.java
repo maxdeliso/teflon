@@ -29,6 +29,7 @@ import java.util.LinkedList;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
 class Teflon {
@@ -120,7 +121,7 @@ class Teflon {
 
       private Queue<Message> sendQueue = new LinkedList<Message>();
       private JTextArea outputTextArea;
-      private JTextArea inputTextArea;
+      private JTextField inputTextField;
       final private Teflon parent;
 
       public TeflonLocalHandler(Teflon parent) {
@@ -136,8 +137,9 @@ class Teflon {
          public void keyReleased(KeyEvent ke) {
             if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
                parent.remote().queueMessage(
-                     new Message("test", inputTextArea.getText()));
-               inputTextArea.setText("");
+                     new Message("test", inputTextField.getText()));
+
+               inputTextField.setText("");
             }
          }
 
@@ -150,7 +152,7 @@ class Teflon {
       private WindowListener localWindowListener = new WindowListener() {
          @Override
          public void windowActivated(WindowEvent we) {
-            inputTextArea.requestFocus();
+            inputTextField.requestFocus();
          }
 
          @Override
@@ -178,7 +180,7 @@ class Teflon {
 
          @Override
          public void windowOpened(WindowEvent we) {
-            inputTextArea.requestFocus();
+            inputTextField.requestFocus();
          }
       };
 
@@ -187,9 +189,8 @@ class Teflon {
          outputTextArea.setLineWrap(true);
          outputTextArea.setEditable(false);
 
-         inputTextArea = new JTextArea();
-         inputTextArea.setLineWrap(true);
-         inputTextArea.addKeyListener(localKeyListener);
+         inputTextField = new JTextField();
+         inputTextField.addKeyListener(localKeyListener);
 
          this.setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
          this.setTitle(TEFLON_TITLE);
@@ -197,7 +198,7 @@ class Teflon {
 
          this.addWindowListener(localWindowListener);
          this.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
-         this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextArea));
+         this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
 
          this.setVisible(true);
       }
@@ -215,8 +216,8 @@ class Teflon {
                      SwingUtilities.invokeLater(new Runnable() {
                         @Override
                         public void run() {
-                           outputTextArea.append(msg.toString()); 
-                        }                   
+                           outputTextArea.append(msg.toString());
+                        }
                      });
                   }
                }
