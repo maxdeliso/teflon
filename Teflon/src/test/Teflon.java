@@ -227,8 +227,7 @@ class Teflon {
                      new Message(inputDatagram.getSocketAddress().toString(),
                            decodeUTF8(inputDatagram.getData())));
 
-            } else {
-               /* attempt to pull a message off the send queue and send it */
+            } else
                synchronized (sendQueue) {
                   Message msg = sendQueue.poll();
 
@@ -236,7 +235,7 @@ class Teflon {
                      /* TODO: broadcast UDP message to remote */
                   }
                }
-            }
+
          }
       }
 
