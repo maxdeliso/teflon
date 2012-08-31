@@ -1,6 +1,6 @@
 /*
  * author: Max DeLiso <maxdeliso@gmail.com>
- * purpose: simple multithreaded UDP chat program 
+ * purpose: multithreaded UDP chat program 
  */
 
 package test;
@@ -13,11 +13,12 @@ import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
 import java.net.PortUnreachableException;
 
+import java.awt.BorderLayout;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.OutputStreamWriter;
-import java.io.BufferedWriter;
 
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.charset.Charset;
@@ -25,16 +26,20 @@ import java.nio.charset.Charset;
 import java.util.Queue;
 import java.util.LinkedList;
 
+import javax.swing.JFrame;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+
 class Teflon {
-   public static final int     TEFLON_PORT      = 1337;
-   public static final byte[]  TEFLON_ADDRESS   = new byte[] { 0, 0, 0, 0 };
-   public static final int     IO_TIMEOUT_MS    = 10;
-   public static final int     INPUT_BUFFER_LEN = 1024;
-   public static final Charset UTF8_CHARSET     = Charset.forName("UTF-8");
+   public static final int TEFLON_PORT = 1337;
+   public static final byte[] TEFLON_ADDRESS = new byte[] { 0, 0, 0, 0 };
+   public static final int IO_TIMEOUT_MS = 10;
+   public static final int INPUT_BUFFER_LEN = 1024;
+   public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
    private TeflonRemoteHandler remoteHandler;
-   private TeflonLocalHandler  localHandler;
-   private boolean             alive;
+   private TeflonLocalHandler localHandler;
+   private boolean alive;
 
    private static void reportException(Exception ex) {
       System.err.println(ex);
@@ -97,7 +102,7 @@ class Teflon {
 
       @Override
       public String toString() {
-         return id + ">>" + body;
+         return id + " >> " + body;
       }
    }
 
@@ -105,19 +110,95 @@ class Teflon {
       public void queueMessage(Message msg);
    }
 
-   private class TeflonLocalHandler implements Runnable, CommDestiny {
-      private BufferedReader kbInput;
-      private BufferedWriter kbOutput;
-      private Teflon         parent;
+   @SuppressWarnings("serial")
+   private class TeflonLocalHandler extends JFrame implements Runnable,
+         CommDestiny {
+      private static final int TEFLON_WIDTH = 512;
+      private static final int TEFLON_HEIGHT = 316;
+      private static final String TEFLON_TITLE = "Teflon";
+
       private Queue<Message> sendQueue = new LinkedList<Message>();
+      private JTextArea outputTextArea;
+      private JTextArea inputTextArea;
+      final private Teflon parent;
 
       public TeflonLocalHandler(Teflon parent) {
          this.parent = parent;
       }
 
+      private KeyListener localKeyListener = new KeyListener() {
+         @Override
+         public void keyPressed(KeyEvent ke) {
+         }
+
+         @Override
+         public void keyReleased(KeyEvent ke) {
+            if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
+               parent.remote().queueMessage(
+                     new Message("test", inputTextArea.getText()));
+               inputTextArea.setText("");
+            }
+         }
+
+         @Override
+         public void keyTyped(KeyEvent ke) {
+
+         }
+      };
+
+      private WindowListener localWindowListener = new WindowListener() {
+         @Override
+         public void windowActivated(WindowEvent we) {
+            inputTextArea.requestFocus();
+         }
+
+         @Override
+         public void windowClosed(WindowEvent we) {
+            parent.kill();
+         }
+
+         @Override
+         public void windowClosing(WindowEvent we) {
+            parent.kill();
+            dispose();
+         }
+
+         @Override
+         public void windowDeactivated(WindowEvent we) {
+         }
+
+         @Override
+         public void windowDeiconified(WindowEvent we) {
+         }
+
+         @Override
+         public void windowIconified(WindowEvent we) {
+         }
+
+         @Override
+         public void windowOpened(WindowEvent we) {
+            inputTextArea.requestFocus();
+         }
+      };
+
       private void init() {
-         kbInput = new BufferedReader(new InputStreamReader(System.in));
-         kbOutput = new BufferedWriter(new OutputStreamWriter(System.out));
+         outputTextArea = new JTextArea();
+         outputTextArea.setLineWrap(true);
+         outputTextArea.setEditable(false);
+
+         inputTextArea = new JTextArea();
+         inputTextArea.setLineWrap(true);
+         inputTextArea.addKeyListener(localKeyListener);
+
+         this.setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
+         this.setTitle(TEFLON_TITLE);
+         this.setLayout(new BorderLayout());
+
+         this.addWindowListener(localWindowListener);
+         this.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
+         this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextArea));
+
+         this.setVisible(true);
       }
 
       @Override
@@ -126,28 +207,17 @@ class Teflon {
 
          while (parent.alive()) {
             try {
-               if (kbInput.ready()) {
-                  /* if there was data from local */
-                  String inputLine = kbInput.readLine();
 
-                  kbOutput.write("<" + inputLine + "\n", 0,
-                        inputLine.length() + 2);
-                  kbOutput.flush();
+               /* TODO: actually retrieve local name */
+               synchronized (sendQueue) {
+                  Message msg = sendQueue.poll();
 
-                  /* TODO: actually retrieve local name */
-                  parent.remote().queueMessage(new Message("test", inputLine));
-               } else
-                  synchronized (sendQueue) {
-                     Message msg = sendQueue.poll();
-
-                     if (msg != null) {
-                        /* TODO: print to local */
-                     }
+                  if (msg != null) {
+                     /* TODO: print to local */
                   }
+               }
 
                Thread.sleep(IO_TIMEOUT_MS);
-            } catch (IOException ioe) {
-               reportException(ioe);
             } catch (InterruptedException ie) {
                reportException(ie);
             }
@@ -165,9 +235,9 @@ class Teflon {
    }
 
    private class TeflonRemoteHandler implements Runnable, CommDestiny {
-      private InetAddress    listeningAddress;
+      private InetAddress listeningAddress;
       private DatagramSocket udpSocket;
-      private Teflon         parent;
+      private Teflon parent;
       private Queue<Message> sendQueue = new LinkedList<Message>();
 
       public TeflonRemoteHandler(Teflon parent) {
@@ -232,17 +302,19 @@ class Teflon {
                   Message msg = sendQueue.poll();
 
                   if (msg != null) {
+                     System.out
+                           .println("STUB FOR REMOTE SEND WITH MSG: " + msg);
                      /* TODO: broadcast UDP message to remote */
                   }
                }
 
          }
+
+         udpSocket.close();
       }
 
       @Override
       public void queueMessage(Message msg) {
-         System.out.println("in remote handler with message: " + msg);
-
          synchronized (sendQueue) {
             sendQueue.add(msg);
          }
