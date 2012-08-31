@@ -29,6 +29,7 @@ import java.util.LinkedList;
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.SwingUtilities;
 
 class Teflon {
    public static final int TEFLON_PORT = 1337;
@@ -207,13 +208,16 @@ class Teflon {
 
          while (parent.alive()) {
             try {
-
-               /* TODO: actually retrieve local name */
                synchronized (sendQueue) {
-                  Message msg = sendQueue.poll();
+                  final Message msg = sendQueue.poll();
 
                   if (msg != null) {
-                     /* TODO: print to local */
+                     SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                           outputTextArea.append(msg.toString()); 
+                        }                   
+                     });
                   }
                }
 
