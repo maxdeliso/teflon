@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.charset.Charset;
 
+import java.text.DateFormat;
+import java.util.Date;
 import java.util.Queue;
 import java.util.LinkedList;
 
@@ -201,6 +203,8 @@ class Teflon {
          this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
 
          this.setVisible(true);
+         
+         displayMessageWithDate("started up");
       }
 
       @Override
@@ -213,12 +217,7 @@ class Teflon {
                   final Message msg = sendQueue.poll();
 
                   if (msg != null) {
-                     SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                           outputTextArea.append(msg.toString());
-                        }
-                     });
+                     displayMessageWithDate(msg.toString());
                   }
                }
 
@@ -236,6 +235,15 @@ class Teflon {
          synchronized (sendQueue) {
             sendQueue.add(msg);
          }
+      }
+      
+      private void displayMessageWithDate(final String msg) {
+         SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+               outputTextArea.append(DateFormat.getInstance().format(new Date()) + " : " + msg.toString());
+            }
+         });
       }
    }
 
