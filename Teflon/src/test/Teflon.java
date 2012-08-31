@@ -36,7 +36,8 @@ import javax.swing.SwingUtilities;
 
 class Teflon {
    public static final int TEFLON_PORT = 1337;
-   public static final byte[] TEFLON_ADDRESS = new byte[] { 0, 0, 0, 0 };
+   public static final byte[] TEFLON_RECV_ADDRESS = new byte[] { 0, 0, 0, 0 };
+   public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff };
    public static final int IO_TIMEOUT_MS = 10;
    public static final int INPUT_BUFFER_LEN = 1024;
    public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
@@ -259,7 +260,7 @@ class Teflon {
 
       private boolean init() {
          try {
-            listeningAddress = InetAddress.getByAddress(TEFLON_ADDRESS);
+            listeningAddress = InetAddress.getByAddress(TEFLON_RECV_ADDRESS);
             udpSocket = new DatagramSocket(TEFLON_PORT, listeningAddress);
             udpSocket.setBroadcast(true);
             udpSocket.setSoTimeout(IO_TIMEOUT_MS);
@@ -318,6 +319,22 @@ class Teflon {
                      System.out
                            .println("STUB FOR REMOTE SEND WITH MSG: " + msg);
                      /* TODO: broadcast UDP message to remote */
+
+                     byte[] encodedMessage = encodeUTF8(msg.toString());
+
+
+                     try {
+                        DatagramPacket outgoingPacket = new DatagramPacket(
+                           encodedMessage, 
+                           encodedMessage.length, 
+                           InetAddress.getByAddress(TEFLON_SEND_ADDRESS), 
+                           TEFLON_PORT);
+
+
+                     } catch (UnknownHostException uhe) {
+                        reportException(uhe);
+                     }
+
                   }
                }
 
