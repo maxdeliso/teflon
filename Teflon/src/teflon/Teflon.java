@@ -3,7 +3,7 @@
  * purpose: multithreaded UDP chat program 
  */
 
-package test;
+package teflon;
 
 import java.awt.BorderLayout;
 import java.awt.event.KeyEvent;
@@ -36,7 +36,7 @@ class Teflon {
    public static final byte[] TEFLON_RECV_ADDRESS = new byte[] { 0, 0, 0, 0 };
    public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff,
          (byte) 0xff, (byte) 0xff };
-   public static final int IO_TIMEOUT_MS = 10;
+   public static final int IO_TIMEOUT_MS = 50;
    public static final int INPUT_BUFFER_LEN = 1024;
    public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 
@@ -312,9 +312,6 @@ class Teflon {
                   Message msg = sendQueue.poll();
 
                   if (msg != null) {
-                     System.out.println("STUB FOR REMOTE SEND WITH MSG: " + msg);
-                     /* TODO: broadcast UDP message to remote */
-
                      byte[] encodedMessage = encodeUTF8(msg.toString());
 
                      try {
@@ -322,10 +319,12 @@ class Teflon {
                               encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
                               TEFLON_PORT);
 
+                        udpSocket.send(outgoingPacket);
                      } catch (UnknownHostException uhe) {
                         reportException(uhe);
+                     } catch (IOException ioe) {
+                        reportException(ioe);
                      }
-
                   }
                }
 
