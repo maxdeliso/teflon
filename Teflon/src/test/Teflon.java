@@ -5,28 +5,25 @@
 
 package test;
 
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.net.SocketException;
-import java.net.DatagramPacket;
-import java.net.SocketTimeoutException;
-import java.net.PortUnreachableException;
-
 import java.awt.BorderLayout;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.IOException;
-
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.PortUnreachableException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.charset.Charset;
-
 import java.text.DateFormat;
 import java.util.Date;
-import java.util.Queue;
 import java.util.LinkedList;
+import java.util.Queue;
 
 import javax.swing.JFrame;
 import javax.swing.JScrollPane;
@@ -37,7 +34,8 @@ import javax.swing.SwingUtilities;
 class Teflon {
    public static final int TEFLON_PORT = 1337;
    public static final byte[] TEFLON_RECV_ADDRESS = new byte[] { 0, 0, 0, 0 };
-   public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff };
+   public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff,
+         (byte) 0xff, (byte) 0xff };
    public static final int IO_TIMEOUT_MS = 10;
    public static final int INPUT_BUFFER_LEN = 1024;
    public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
@@ -116,8 +114,7 @@ class Teflon {
    }
 
    @SuppressWarnings("serial")
-   private class TeflonLocalHandler extends JFrame implements Runnable,
-         CommDestiny {
+   private class TeflonLocalHandler extends JFrame implements Runnable, CommDestiny {
       private static final int TEFLON_WIDTH = 512;
       private static final int TEFLON_HEIGHT = 316;
       private static final String TEFLON_TITLE = "Teflon";
@@ -139,8 +136,7 @@ class Teflon {
          @Override
          public void keyReleased(KeyEvent ke) {
             if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-               parent.remote().queueMessage(
-                     new Message("test", inputTextField.getText()));
+               parent.remote().queueMessage(new Message("test", inputTextField.getText()));
 
                inputTextField.setText("");
             }
@@ -204,7 +200,7 @@ class Teflon {
          this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
 
          this.setVisible(true);
-         
+
          displayMessageWithDate("started up");
       }
 
@@ -237,12 +233,13 @@ class Teflon {
             sendQueue.add(msg);
          }
       }
-      
+
       private void displayMessageWithDate(final String msg) {
          SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-               outputTextArea.append(DateFormat.getInstance().format(new Date()) + " : " + msg.toString());
+               outputTextArea.append(DateFormat.getInstance().format(new Date()) + " : "
+                     + msg.toString());
             }
          });
       }
@@ -286,8 +283,7 @@ class Teflon {
          }
 
          byte[] inputBuffer = new byte[INPUT_BUFFER_LEN];
-         DatagramPacket inputDatagram = new DatagramPacket(inputBuffer,
-               INPUT_BUFFER_LEN);
+         DatagramPacket inputDatagram = new DatagramPacket(inputBuffer, INPUT_BUFFER_LEN);
 
          while (parent.alive()) {
             try {
@@ -316,20 +312,15 @@ class Teflon {
                   Message msg = sendQueue.poll();
 
                   if (msg != null) {
-                     System.out
-                           .println("STUB FOR REMOTE SEND WITH MSG: " + msg);
+                     System.out.println("STUB FOR REMOTE SEND WITH MSG: " + msg);
                      /* TODO: broadcast UDP message to remote */
 
                      byte[] encodedMessage = encodeUTF8(msg.toString());
 
-
                      try {
-                        DatagramPacket outgoingPacket = new DatagramPacket(
-                           encodedMessage, 
-                           encodedMessage.length, 
-                           InetAddress.getByAddress(TEFLON_SEND_ADDRESS), 
-                           TEFLON_PORT);
-
+                        DatagramPacket outgoingPacket = new DatagramPacket(encodedMessage,
+                              encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
+                              TEFLON_PORT);
 
                      } catch (UnknownHostException uhe) {
                         reportException(uhe);
