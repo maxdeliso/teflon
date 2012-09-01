@@ -21,6 +21,7 @@ import java.net.UnknownHostException;
 import java.nio.channels.IllegalBlockingModeException;
 import java.nio.charset.Charset;
 import java.text.DateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -105,7 +106,7 @@ class Teflon {
 
       @Override
       public String toString() {
-         return id + " >> " + body;
+         return id + ": " + body;
       }
    }
 
@@ -156,7 +157,6 @@ class Teflon {
 
          @Override
          public void windowClosed(WindowEvent we) {
-            parent.kill();
          }
 
          @Override
@@ -239,7 +239,7 @@ class Teflon {
             @Override
             public void run() {
                outputTextArea.append(DateFormat.getInstance().format(new Date()) + " : "
-                     + msg.toString());
+                     + msg.toString() + "\n");
             }
          });
       }
@@ -288,45 +288,44 @@ class Teflon {
          while (parent.alive()) {
             try {
                udpSocket.receive(inputDatagram);
+
+               System.out.println("received block with offset/length of: "
+                     + inputDatagram.getOffset() + " / " + inputDatagram.getLength());
+
+               final byte[] messageBytes = Arrays.copyOfRange(inputDatagram.getData(),
+                     inputDatagram.getOffset(),
+                     inputDatagram.getOffset() + inputDatagram.getLength());
+
+               parent.local().queueMessage(new Message("", decodeUTF8(messageBytes)));
             } catch (IllegalBlockingModeException ibme) {
                reportException(ibme);
             } catch (PortUnreachableException pue) {
                reportException(pue);
             } catch (SocketTimeoutException ste) {
-               /* this is going to be the usual case, so we ignore it */
+
             } catch (IOException ioe) {
                reportException(ioe);
             }
 
-            if (inputDatagram.getOffset() > 0) {
-               /*
-                * if there was data received from remote, post it to local
-                * handler's message queue
-                */
-               parent.local().queueMessage(
-                     new Message(inputDatagram.getSocketAddress().toString(),
-                           decodeUTF8(inputDatagram.getData())));
+            synchronized (sendQueue) {
+               Message msg = sendQueue.poll();
 
-            } else
-               synchronized (sendQueue) {
-                  Message msg = sendQueue.poll();
+               if (msg != null) {
+                  byte[] encodedMessage = encodeUTF8(msg.toString());
 
-                  if (msg != null) {
-                     byte[] encodedMessage = encodeUTF8(msg.toString());
+                  try {
+                     DatagramPacket outgoingPacket = new DatagramPacket(encodedMessage,
+                           encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
+                           TEFLON_PORT);
 
-                     try {
-                        DatagramPacket outgoingPacket = new DatagramPacket(encodedMessage,
-                              encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
-                              TEFLON_PORT);
-
-                        udpSocket.send(outgoingPacket);
-                     } catch (UnknownHostException uhe) {
-                        reportException(uhe);
-                     } catch (IOException ioe) {
-                        reportException(ioe);
-                     }
+                     udpSocket.send(outgoingPacket);
+                  } catch (UnknownHostException uhe) {
+                     reportException(uhe);
+                  } catch (IOException ioe) {
+                     reportException(ioe);
                   }
                }
+            }
 
          }
 
