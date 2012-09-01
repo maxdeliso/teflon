@@ -137,7 +137,7 @@ class Teflon {
          @Override
          public void keyReleased(KeyEvent ke) {
             if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-               parent.remote().queueMessage(new Message("test", inputTextField.getText()));
+               parent.remote().queueMessage(new Message("L", inputTextField.getText()));
 
                inputTextField.setText("");
             }
@@ -201,7 +201,7 @@ class Teflon {
 
          this.setVisible(true);
 
-         displayMessageWithDate("started up");
+         displayMessageWithDate(new Message("system", "started up"));
       }
 
       @Override
@@ -214,7 +214,7 @@ class Teflon {
                   final Message msg = sendQueue.poll();
 
                   if (msg != null) {
-                     displayMessageWithDate(msg.toString());
+                     displayMessageWithDate(msg);
                   }
                }
 
@@ -234,7 +234,7 @@ class Teflon {
          }
       }
 
-      private void displayMessageWithDate(final String msg) {
+      private void displayMessageWithDate(final Message msg) {
          SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
