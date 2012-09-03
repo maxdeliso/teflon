@@ -1,8 +1,9 @@
 ## Teflon ##
 
-Teflon is a simple peer to peer chat application implemented in java.
-It was written to demonstrate the ugliness of the java programming language.
+Teflon is a simple peer to peer chat application implemented in Java.
+It was written to demonstrate the ugliness of the Java programming language.
 The eventual plan is to port this code to a series of other languages.
+
 
 * * *
 
