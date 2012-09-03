@@ -11,6 +11,7 @@ import java.awt.event.KeyListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -188,37 +189,51 @@ class Teflon {
          }
       };
 
-      private void init() {
-         headerPanel = new JPanel();
-         headerPanel.setLayout(new BorderLayout());
+      private Runnable createInitRunnable() {
+         final TeflonLocalHandler teflonLocalHandler = this;
 
-         helpButton = new JButton("Help");
-         headerPanel.add(BorderLayout.LINE_END, helpButton);
+         return new Runnable() {
 
-         outputTextArea = new JTextArea();
-         outputTextArea.setLineWrap(true);
-         outputTextArea.setEditable(false);
+            @Override
+            public void run() {
+               headerPanel = new JPanel();
+               headerPanel.setLayout(new BorderLayout());
 
-         inputTextField = new JTextField();
-         inputTextField.addKeyListener(localKeyListener);
+               helpButton = new JButton("Help");
+               headerPanel.add(BorderLayout.LINE_END, helpButton);
 
-         this.setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
-         this.setTitle(TEFLON_TITLE);
-         this.setLayout(new BorderLayout());
+               outputTextArea = new JTextArea();
+               outputTextArea.setLineWrap(true);
+               outputTextArea.setEditable(false);
 
-         this.addWindowListener(localWindowListener);
-         this.add(BorderLayout.PAGE_START, headerPanel);
-         this.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
-         this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
+               inputTextField = new JTextField();
+               inputTextField.addKeyListener(localKeyListener);
 
-         this.setVisible(true);
+               teflonLocalHandler.setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
+               teflonLocalHandler.setTitle(TEFLON_TITLE);
+               teflonLocalHandler.setLayout(new BorderLayout());
 
-         displayMessageWithDate(new Message("system", "started up"));
+               teflonLocalHandler.addWindowListener(localWindowListener);
+               teflonLocalHandler.add(BorderLayout.PAGE_START, headerPanel);
+               teflonLocalHandler.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
+               teflonLocalHandler.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
+
+               teflonLocalHandler.setVisible(true);
+            }
+         };
       }
 
       @Override
       public void run() {
-         init();
+         try {
+            SwingUtilities.invokeAndWait(createInitRunnable());
+         } catch (InterruptedException ie) {
+            reportException(ie);
+         } catch (InvocationTargetException ite) {
+            reportException(ite);
+         }
+
+         displayMessageWithDate(new Message("system", "started up"));
 
          while (parent.alive()) {
             try {
