@@ -96,6 +96,8 @@ class Teflon {
       } catch (InterruptedException ie) {
          reportException(ie);
       }
+
+      System.out.println("DEBUG: clean exit");
    }
 
    private class Message {
@@ -166,7 +168,6 @@ class Teflon {
          @Override
          public void windowClosing(WindowEvent we) {
             parent.kill();
-            dispose();
          }
 
          @Override
@@ -234,6 +235,20 @@ class Teflon {
                reportException(ie);
             }
          }
+
+         SwingUtilities.invokeLater(createDisposalRunnable());
+      }
+
+      private Runnable createDisposalRunnable() {
+         final TeflonLocalHandler teflonLocalHandler = this;
+
+         return new Runnable() {
+
+            @Override
+            public void run() {
+               teflonLocalHandler.dispose();
+            }
+         };
       }
 
       @Override
