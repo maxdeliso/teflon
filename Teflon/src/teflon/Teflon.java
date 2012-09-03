@@ -49,8 +49,14 @@ class Teflon {
    private boolean alive;
 
    private static void reportException(Exception ex) {
-      System.err.println(ex);
+      System.err.println("ERROR: " + Thread.currentThread() + " : " + ex);
       ex.printStackTrace();
+      System.err.println("there was a fatal error. please report it. aborting.");
+      System.exit(1);
+   }
+
+   private static void debugMessage(String message) {
+      System.out.println("DEBUG: " + Thread.currentThread() + " : " + message);
    }
 
    public static void main(String args[]) {
@@ -98,7 +104,7 @@ class Teflon {
          reportException(ie);
       }
 
-      System.out.println("DEBUG: clean exit");
+      debugMessage("main thread exiting");
    }
 
    private class Message {
@@ -251,7 +257,15 @@ class Teflon {
             }
          }
 
-         SwingUtilities.invokeLater(createDisposalRunnable());
+         try {
+            SwingUtilities.invokeAndWait(createDisposalRunnable());
+         } catch (InterruptedException ie) {
+            reportException(ie);
+         } catch (InvocationTargetException ite) {
+            reportException(ite);
+         }
+
+         debugMessage("swing context destroyed, local handler thread exiting");
       }
 
       private Runnable createDisposalRunnable() {
@@ -268,7 +282,7 @@ class Teflon {
 
       @Override
       public void queueMessage(Message msg) {
-         System.out.println("in local handler with message: " + msg);
+         debugMessage("in local handler thread with message: " + msg);
 
          synchronized (sendQueue) {
             sendQueue.add(msg);
@@ -330,9 +344,10 @@ class Teflon {
             try {
                udpSocket.receive(inputDatagram);
 
-               System.out.println("received block with offset/length of: "
-                     + inputDatagram.getOffset() + " / " + inputDatagram.getLength());
+               debugMessage("received block with offset/length of: " + inputDatagram.getOffset()
+                     + " / " + inputDatagram.getLength());
 
+               /* TODO: verify this, it smells a little funny */
                final byte[] messageBytes = Arrays.copyOfRange(inputDatagram.getData(),
                      inputDatagram.getOffset(),
                      inputDatagram.getOffset() + inputDatagram.getLength());
@@ -371,6 +386,7 @@ class Teflon {
          }
 
          udpSocket.close();
+         debugMessage("remote handler thread exiting");
       }
 
       @Override
