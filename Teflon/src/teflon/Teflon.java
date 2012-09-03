@@ -1,6 +1,6 @@
 /*
  * author: Max DeLiso <maxdeliso@gmail.com>
- * purpose: multithreaded UDP chat program 
+ * purpose: graphical UDP chat program 
  */
 
 package teflon;
@@ -26,7 +26,9 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.Queue;
 
+import javax.swing.JButton;
 import javax.swing.JFrame;
+import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -123,6 +125,8 @@ class Teflon {
       private Queue<Message> sendQueue = new LinkedList<Message>();
       private JTextArea outputTextArea;
       private JTextField inputTextField;
+      private JPanel headerPanel;
+      private JButton helpButton;
       final private Teflon parent;
 
       public TeflonLocalHandler(Teflon parent) {
@@ -184,6 +188,12 @@ class Teflon {
       };
 
       private void init() {
+         headerPanel = new JPanel();
+         headerPanel.setLayout(new BorderLayout());
+
+         helpButton = new JButton("Help");
+         headerPanel.add(BorderLayout.LINE_END, helpButton);
+
          outputTextArea = new JTextArea();
          outputTextArea.setLineWrap(true);
          outputTextArea.setEditable(false);
@@ -196,6 +206,7 @@ class Teflon {
          this.setLayout(new BorderLayout());
 
          this.addWindowListener(localWindowListener);
+         this.add(BorderLayout.PAGE_START, headerPanel);
          this.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
          this.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
 
