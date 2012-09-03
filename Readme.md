@@ -21,6 +21,15 @@ Because the repository includes a .project file and some other things, it should
 If you do a build and you find that there is an error in the code which needs to be fixed, are unwilling or unable to fix it yourself, but still care enough to take some action, submit it in the form of an issue to the following URL: https://github.com/maxdeliso/teflon/issues. 
 If you fix a bug that you found in your fork of this repository, please submit a merge request.
 
+### Bits ###
+
+If you just want bits, I'll try to periodically upload runnable jars at release milestones. 
+I don't currently have a detailed versioning system in place but I'm banking on the fact that nobody will care.
+In its prototypical state, the size of the runnable jar (i.e. build artifact) is a mere 12 kilobytes.
+You should be able to simply download the file and double click it to run the program.
+
+The bits are available here: https://github.com/maxdeliso/teflon/downloads.
+
 * * *
 
 ### Concurrency Model ###
