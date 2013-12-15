@@ -164,8 +164,8 @@ class Teflon {
       alive = true;
       remoteHandler = new TeflonRemoteHandler(this);
       localHandler = new TeflonLocalHandler(this);
-      remoteHandlerThread = new Thread(remoteHandler);
-      localHandlerThread = new Thread(localHandler);
+      remoteHandlerThread = new Thread(remoteHandler, "UDP I/O Thread");
+      localHandlerThread = new Thread(localHandler, "UI Helper Thread");
 
       remoteHandlerThread.start();
       localHandlerThread.start();
@@ -357,7 +357,6 @@ class Teflon {
          final TeflonLocalHandler teflonLocalHandler = this;
 
          return new Runnable() {
-
             @Override
             public void run() {
                teflonLocalHandler.dispose();
