@@ -24,8 +24,7 @@ import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -58,6 +57,8 @@ class Teflon {
     */
    private TeflonRemoteHandler remoteHandler;
    private TeflonLocalHandler localHandler;
+   private Thread remoteHandlerThread;
+   private Thread localHandlerThread;
    private boolean alive;
 
    /*
@@ -147,6 +148,8 @@ class Teflon {
     */
    public synchronized void kill() {
       alive = false;
+      remoteHandlerThread.interrupt();
+      localHandlerThread.interrupt();
    }
 
    /*
@@ -161,8 +164,8 @@ class Teflon {
       alive = true;
       remoteHandler = new TeflonRemoteHandler(this);
       localHandler = new TeflonLocalHandler(this);
-      Thread remoteHandlerThread = new Thread(remoteHandler);
-      Thread localHandlerThread = new Thread(localHandler);
+      remoteHandlerThread = new Thread(remoteHandler);
+      localHandlerThread = new Thread(localHandler);
 
       remoteHandlerThread.start();
       localHandlerThread.start();
@@ -217,7 +220,7 @@ class Teflon {
       private static final int TEFLON_HEIGHT = 316;
       private static final String TEFLON_TITLE = "Teflon";
 
-      private Queue<Message> sendQueue = new LinkedList<Message>();
+      private LinkedBlockingQueue<Message> sendQueue = new LinkedBlockingQueue<Message>();
       private JTextArea outputTextArea;
       private JTextField inputTextField;
       private JPanel headerPanel;
@@ -329,17 +332,13 @@ class Teflon {
 
          while (parent.alive()) {
             try {
-               synchronized (sendQueue) {
-                  final Message msg = sendQueue.poll();
+               final Message msg = sendQueue.take();
 
-                  if (msg != null) {
-                     displayMessageWithDate(msg);
-                  }
+               if (msg != null) {
+                  displayMessageWithDate(msg);
                }
-
-               Thread.sleep(IO_TIMEOUT_MS);
             } catch (InterruptedException ie) {
-               reportException(ie);
+               /* queue take interrupted - this is probably a normal termination */
             }
          }
 
@@ -369,10 +368,7 @@ class Teflon {
       @Override
       public void queueMessage(Message msg) {
          debugMessage("in local handler thread with message: " + msg);
-
-         synchronized (sendQueue) {
-            sendQueue.add(msg);
-         }
+         sendQueue.add(msg);
       }
 
       private void displayMessageWithDate(final Message msg) {
@@ -397,7 +393,7 @@ class Teflon {
       private InetAddress listeningAddress;
       private DatagramSocket udpSocket;
       private Teflon parent;
-      private Queue<Message> sendQueue = new LinkedList<Message>();
+      private LinkedBlockingQueue<Message> sendQueue = new LinkedBlockingQueue<Message>();
 
       public TeflonRemoteHandler(Teflon parent) {
          this.parent = parent;
@@ -440,7 +436,6 @@ class Teflon {
                debugMessage("received block with offset/length of: " + inputDatagram.getOffset()
                      + " / " + inputDatagram.getLength());
 
-               /* TODO: verify this, it smells a little funny */
                final byte[] messageBytes = Arrays.copyOfRange(inputDatagram.getData(),
                      inputDatagram.getOffset(),
                      inputDatagram.getOffset() + inputDatagram.getLength());
@@ -456,26 +451,27 @@ class Teflon {
                reportException(ioe);
             }
 
-            synchronized (sendQueue) {
-               Message msg = sendQueue.poll();
+            Message msg = sendQueue.poll();
+            /*
+             * this will not be busy due to timed blocking i/o in above receive
+             * call
+             */
 
-               if (msg != null) {
-                  byte[] encodedMessage = encodeUTF8(msg.toString());
+            if (msg != null) {
+               byte[] encodedMessage = encodeUTF8(msg.toString());
 
-                  try {
-                     DatagramPacket outgoingPacket = new DatagramPacket(encodedMessage,
-                           encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
-                           TEFLON_PORT);
+               try {
+                  DatagramPacket outgoingPacket = new DatagramPacket(encodedMessage,
+                        encodedMessage.length, InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
+                        TEFLON_PORT);
 
-                     udpSocket.send(outgoingPacket);
-                  } catch (UnknownHostException uhe) {
-                     reportException(uhe);
-                  } catch (IOException ioe) {
-                     reportException(ioe);
-                  }
+                  udpSocket.send(outgoingPacket);
+               } catch (UnknownHostException uhe) {
+                  reportException(uhe);
+               } catch (IOException ioe) {
+                  reportException(ioe);
                }
             }
-
          }
 
          udpSocket.close();
