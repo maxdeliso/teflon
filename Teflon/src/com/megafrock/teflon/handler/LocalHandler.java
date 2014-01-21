@@ -1,8 +1,8 @@
 package com.megafrock.teflon.handler;
 
 import java.awt.BorderLayout;
+import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.lang.reflect.InvocationTargetException;
@@ -45,11 +45,7 @@ public class LocalHandler extends JFrame implements Runnable, CommDestiny {
       this.parent = parent;
    }
 
-   private KeyListener localKeyListener = new KeyListener() {
-      @Override
-      public void keyPressed(KeyEvent ke) {
-      }
-
+   private class LocalKeyAdapter extends KeyAdapter {
       @Override
       public void keyReleased(KeyEvent ke) {
          if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
@@ -58,12 +54,7 @@ public class LocalHandler extends JFrame implements Runnable, CommDestiny {
             inputTextField.setText("");
          }
       }
-
-      @Override
-      public void keyTyped(KeyEvent ke) {
-
-      }
-   };
+   }
 
    private class LocalWindowAdapter extends WindowAdapter {
       @Override
@@ -95,7 +86,7 @@ public class LocalHandler extends JFrame implements Runnable, CommDestiny {
             outputTextArea.setEditable(false);
 
             inputTextField = new JTextField();
-            inputTextField.addKeyListener(localKeyListener);
+            inputTextField.addKeyListener(new LocalKeyAdapter());
 
             teflonLocalHandler.setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
             teflonLocalHandler.setTitle(TEFLON_TITLE);
