@@ -3,8 +3,8 @@ package com.megafrock.teflon.handler;
 import java.awt.BorderLayout;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
 import java.lang.reflect.InvocationTargetException;
 import java.text.DateFormat;
 import java.util.Date;
@@ -65,38 +65,17 @@ public class LocalHandler extends JFrame implements Runnable, CommDestiny {
       }
    };
 
-   private WindowListener localWindowListener = new WindowListener() {
-      @Override
-      public void windowActivated(WindowEvent we) {
-         inputTextField.requestFocus();
-      }
-
-      @Override
-      public void windowClosed(WindowEvent we) {
-      }
-
+   private class LocalWindowAdapter extends WindowAdapter {
       @Override
       public void windowClosing(WindowEvent we) {
          parent.kill();
       }
 
       @Override
-      public void windowDeactivated(WindowEvent we) {
-      }
-
-      @Override
-      public void windowDeiconified(WindowEvent we) {
-      }
-
-      @Override
-      public void windowIconified(WindowEvent we) {
-      }
-
-      @Override
       public void windowOpened(WindowEvent we) {
          inputTextField.requestFocus();
       }
-   };
+   }
 
    private Runnable createInitRunnable() {
       final LocalHandler teflonLocalHandler = this;
@@ -122,7 +101,7 @@ public class LocalHandler extends JFrame implements Runnable, CommDestiny {
             teflonLocalHandler.setTitle(TEFLON_TITLE);
             teflonLocalHandler.setLayout(new BorderLayout());
 
-            teflonLocalHandler.addWindowListener(localWindowListener);
+            teflonLocalHandler.addWindowListener(new LocalWindowAdapter());
             teflonLocalHandler.add(BorderLayout.PAGE_START, headerPanel);
             teflonLocalHandler.add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
             teflonLocalHandler.add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
