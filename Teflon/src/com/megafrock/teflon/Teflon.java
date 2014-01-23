@@ -12,14 +12,11 @@ import com.megafrock.teflon.handler.RemoteHandler;
 
 public class Teflon {
    /*
-    * These are constants which are global to the entire application. In the
-    * future they should probably be moved into a preference file so that they
-    * can be configured by the user.
+    * These are constants which are global to the entire application.
     */
    public static final int TEFLON_PORT = 1337;
    public static final byte[] TEFLON_RECV_ADDRESS = new byte[] { 0, 0, 0, 0 };
-   public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff,
-         (byte) 0xff, (byte) 0xff };
+   public static final byte[] TEFLON_SEND_ADDRESS = new byte[] { (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff };
    public static final int IO_TIMEOUT_MS = 50;
    public static final int INPUT_BUFFER_LEN = 1024;
    public static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
@@ -61,11 +58,7 @@ public class Teflon {
 
    /*
     * This is the application entry point. Note that the application's command
-    * line arguments are currently ignored, and all that it does is instantiate
-    * a Teflon object. The Teflon object, which is the top level class for the
-    * application, contains all application logic. It is also useful to note
-    * that every single line of code that executes in this program can be traced
-    * back to this root invocation of the constructor of Teflon.
+    * line arguments are currently ignored.
     */
    public static void main(String args[]) {
       new Teflon();
@@ -134,7 +127,7 @@ public class Teflon {
     * that they may easily acquire references to each other, and any other
     * handlers that may be introduced in the future. Note that the handlers all
     * implement Runnable and are started in their own threads, which means that
-    * they execute concurrently, or at the same time.
+    * they execute in parallel.
     */
    public Teflon() {
       alive = true;
