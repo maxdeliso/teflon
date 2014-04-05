@@ -1,8 +1,7 @@
 package com.megafrock.teflon;
 
 /*
- * The message class describes a message. It needs to be extended
- * significantly.
+ * The message class describes a message.
  */
 public class Message {
    public String id, body;
