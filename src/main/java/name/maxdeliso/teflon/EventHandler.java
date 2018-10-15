@@ -1,46 +1,54 @@
 package name.maxdeliso.teflon;
 
-import name.maxdeliso.teflon.data.TeflonMessage;
-import name.maxdeliso.teflon.frames.TeflonFrame;
+import name.maxdeliso.teflon.data.Message;
+import name.maxdeliso.teflon.frames.MainFrame;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Optional;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static name.maxdeliso.teflon.Main.BACKLOG_LENGTH;
+import static name.maxdeliso.teflon.config.Config.BACKLOG_LENGTH;
+import static name.maxdeliso.teflon.config.Config.INPUT_BUFFER_LEN;
+import static name.maxdeliso.teflon.config.Config.IO_TIMEOUT_MS;
+import static name.maxdeliso.teflon.config.Config.TEFLON_PORT;
+import static name.maxdeliso.teflon.config.Config.TEFLON_SEND_ADDRESS;
 
 /**
  * This class contains the main event loop which checks in memory queues, and performs UDP sending/receiving.
  */
-public class EventHandler {
-    private static final byte[] TEFLON_SEND_ADDRESS = new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff};
-    private static final int TEFLON_PORT = 1337;
-    private static final int IO_TIMEOUT_MS = 50;
-    private static final int INPUT_BUFFER_LEN = 4096;
-
+class EventHandler {
     private final AtomicBoolean alive;
-    private final TeflonFrame teflonFrame;
-    private final LinkedBlockingQueue<TeflonMessage> incomingMsgQueue = new LinkedBlockingQueue<>(BACKLOG_LENGTH);
-    private final LinkedBlockingQueue<TeflonMessage> outgoingMsgQueue;
+    private final MainFrame mainFrame;
+    private final LinkedBlockingQueue<Message> incomingMsgQueue = new LinkedBlockingQueue<>(BACKLOG_LENGTH);
+    private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final int localHostId;
 
     /**
      * The EventHandler constructor.
      *
-     * @param alive a flag which is set from AWT threads to signal graceful shutdown.
-     * @param teflonFrame an AWT frame to display the frontend.
+     * @param alive            a flag which is set from AWT threads to signal graceful shutdown.
+     * @param mainFrame        an AWT frame to display the frontend.
      * @param outgoingMsgQueue a message queue to hold message that have been sent but not over the network.
-     * @param localHostId a numeric host identifier.
+     * @param localHostId      a numeric host identifier.
      */
     EventHandler(final AtomicBoolean alive,
-                 final TeflonFrame teflonFrame,
-                 final LinkedBlockingQueue<TeflonMessage> outgoingMsgQueue,
+                 final MainFrame mainFrame,
+                 final LinkedBlockingQueue<Message> outgoingMsgQueue,
                  final int localHostId) {
         this.alive = alive;
-        this.teflonFrame = teflonFrame;
+        this.mainFrame = mainFrame;
         this.outgoingMsgQueue = outgoingMsgQueue;
         this.localHostId = localHostId;
     }
@@ -48,33 +56,32 @@ public class EventHandler {
     /**
      * Main event processing loop.
      */
-    public void loop() {
-        try {
-            final DatagramSocket udpSocket = setupSocket();
-
+    void loop() {
+        try (final DatagramSocket udpSocket = setupSocket()) {
             while (alive.get()) {
-                final Optional<TeflonMessage> newMessage =
-                        Optional.ofNullable(incomingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS));
-                newMessage.ifPresent(teflonFrame::queueMessageDisplay);
+                Optional.ofNullable(incomingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS))
+                        .ifPresent(mainFrame::queueMessageDisplay);
 
-                final Optional<TeflonMessage> msgOpt = pollForMessage();
-                msgOpt.ifPresent(teflonMessage -> sendMessage(udpSocket, teflonMessage));
-                final Optional<DatagramPacket> incomingPacketOpt = receiveFromSocket(udpSocket);
-                incomingPacketOpt.ifPresent(this::receiveMessage);
+                pollForMessage()
+                        .ifPresent(message -> sendMessage(udpSocket, message));
+
+                receiveFromSocket(udpSocket)
+                        .ifPresent(this::receiveMessage);
             }
         } catch (InterruptedException | IOException exc) {
             exc.printStackTrace();
         } finally {
-            teflonFrame.dispose();
+            mainFrame.dispose();
         }
     }
 
     private void receiveMessage(final DatagramPacket datagramPacket) {
         try {
             final ObjectInput datagramInput = new ObjectInputStream(new ByteArrayInputStream(datagramPacket.getData()));
-            final TeflonMessage datagramMessage = (TeflonMessage) datagramInput.readObject();
+            final Message datagramMessage = (Message) datagramInput.readObject();
 
             if (localHostId == datagramMessage.senderId()) {
+                /* Don't receive messages that we ourselves sent */
                 return;
             }
 
@@ -107,7 +114,7 @@ public class EventHandler {
         }
     }
 
-    private Optional<TeflonMessage> pollForMessage() {
+    private Optional<Message> pollForMessage() {
         try {
             return Optional.ofNullable(outgoingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException ie) {
@@ -116,11 +123,11 @@ public class EventHandler {
         }
     }
 
-    private void sendMessage(final DatagramSocket udpSocket, TeflonMessage teflonMessage) {
+    private void sendMessage(final DatagramSocket udpSocket, Message message) {
         try {
             final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
             final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-            objectOutputStream.writeObject(teflonMessage);
+            objectOutputStream.writeObject(message);
             final byte[] messageBytes = byteArrayOutputStream.toByteArray();
 
             final DatagramPacket outgoingPacket = new DatagramPacket(

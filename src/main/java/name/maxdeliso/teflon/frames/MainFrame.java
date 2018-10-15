@@ -1,9 +1,14 @@
 package name.maxdeliso.teflon.frames;
 
-import name.maxdeliso.teflon.data.TeflonMessage;
+import name.maxdeliso.teflon.data.Message;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import java.awt.BorderLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.WindowAdapter;
@@ -13,34 +18,37 @@ import java.util.Date;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static name.maxdeliso.teflon.config.Config.TEFLON_HEIGHT;
+import static name.maxdeliso.teflon.config.Config.TEFLON_TITLE;
+import static name.maxdeliso.teflon.config.Config.TEFLON_WIDTH;
+
 /**
  * A JFrame, which will present a UI through the native windowing system on supported OSes.
- * @see https://docs.oracle.com/javase/8/docs/api/javax/swing/JFrame.html
- * This frame will accept user input, as well as asychronously display messages received over UDP (see queueMessageDisplay).
+ * This frame will accept user input, as well as asynchronously display messages received
+ * over UDP (see queueMessageDisplay).
+ *
+ * @see <a href="https://docs.oracle.com/javase/8/docs/api/javax/swing/JFrame.html">JFrame</a>
  */
-public class TeflonFrame extends JFrame {
-    private static final int TEFLON_WIDTH = 512;
-    private static final int TEFLON_HEIGHT = 316;
-    private static final String TEFLON_TITLE = "Teflon";
+public class MainFrame extends JFrame {
 
     private final JTextArea outputTextArea = new JTextArea();
     private final JPanel headerPanel = new JPanel();
     private final JTextField inputTextField = new JTextField();
     private final DateFormat dateFormat = DateFormat.getInstance();
-    private final LinkedBlockingQueue<TeflonMessage> outgoingMsgQueue;
+    private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final AtomicBoolean alive;
     private final int localHostId;
 
-    public TeflonFrame(final LinkedBlockingQueue<TeflonMessage> outgoingMsgQueue,
-                       final AtomicBoolean alive,
-                       final int localHostId) {
+    public MainFrame(final LinkedBlockingQueue<Message> outgoingMsgQueue,
+                     final AtomicBoolean alive,
+                     final int localHostId) {
         this.outgoingMsgQueue = outgoingMsgQueue;
         this.alive = alive;
         this.localHostId = localHostId;
         buildFrame();
     }
 
-    private void renderMessage(final TeflonMessage msg, final JTextArea outputArea) {
+    private void renderMessage(final Message msg, final JTextArea outputArea) {
         final String timeString = dateFormat.format(new Date());
         outputArea.append(timeString + " : " + msg.toString() + "\n");
     }
@@ -54,7 +62,7 @@ public class TeflonFrame extends JFrame {
             @Override
             public void keyReleased(final KeyEvent ke) {
                 if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-                    TeflonMessage outgoingMessage = new TeflonMessage(localHostId, inputTextField.getText());
+                    Message outgoingMessage = new Message(localHostId, inputTextField.getText());
 
                     try {
                         outgoingMsgQueue.put(outgoingMessage);
@@ -94,9 +102,10 @@ public class TeflonFrame extends JFrame {
 
     /**
      * Queues up a render of a message in this frame.
+     *
      * @param msg the message to render, typically just received from over UDP.
      */
-    public void queueMessageDisplay(final TeflonMessage msg) {
+    public void queueMessageDisplay(final Message msg) {
         SwingUtilities.invokeLater(() -> renderMessage(msg, outputTextArea));
     }
 }
