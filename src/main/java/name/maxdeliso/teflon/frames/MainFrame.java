@@ -1,6 +1,5 @@
 package name.maxdeliso.teflon.frames;
 
-import name.maxdeliso.teflon.EventHandler;
 import name.maxdeliso.teflon.data.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

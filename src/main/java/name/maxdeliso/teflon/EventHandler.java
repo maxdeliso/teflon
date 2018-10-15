@@ -5,23 +5,23 @@ import name.maxdeliso.teflon.frames.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.util.Iterator;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static name.maxdeliso.teflon.config.Config.BACKLOG_LENGTH;
 import static name.maxdeliso.teflon.config.Config.INPUT_BUFFER_LEN;
 import static name.maxdeliso.teflon.config.Config.IO_TIMEOUT_MS;
 import static name.maxdeliso.teflon.config.Config.TEFLON_PORT;
@@ -30,12 +30,11 @@ import static name.maxdeliso.teflon.config.Config.TEFLON_SEND_ADDRESS;
 /**
  * This class contains the main event loop which checks in memory queues, and performs UDP sending/receiving.
  */
-public class EventHandler {
+class EventHandler {
     private static final Logger LOG = LoggerFactory.getLogger(EventHandler.class);
 
     private final AtomicBoolean alive;
     private final MainFrame mainFrame;
-    private final LinkedBlockingQueue<Message> incomingMsgQueue = new LinkedBlockingQueue<>(BACKLOG_LENGTH);
     private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final int localHostId;
 
@@ -44,7 +43,7 @@ public class EventHandler {
      *
      * @param alive            a flag which is set from AWT threads to signal graceful shutdown.
      * @param mainFrame        an AWT frame to display the frontend.
-     * @param outgoingMsgQueue a message queue to hold message that have been sent but not over the network.
+     * @param outgoingMsgQueue a message queue to hold messages prior to sending them over the network.
      * @param localHostId      a numeric host identifier.
      */
     EventHandler(final AtomicBoolean alive,
@@ -61,93 +60,84 @@ public class EventHandler {
      * Main event processing loop.
      */
     void loop() {
-        try (final DatagramSocket udpSocket = setupSocket()) {
+        try (final DatagramChannel datagramChannel = setupSocketChannel();
+             final DatagramSocket ignored = setupDatagramSocket(datagramChannel);
+             final Selector chanSelector = Selector.open()) {
+            datagramChannel.register(chanSelector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+
+            final ByteBuffer incomingPacketBuffer = ByteBuffer.allocate(INPUT_BUFFER_LEN);
+
             while (alive.get()) {
-                Optional.ofNullable(incomingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS))
-                        .ifPresent(mainFrame::queueMessageDisplay);
+                chanSelector.select(IO_TIMEOUT_MS);
+                final Set<SelectionKey> selectionKeySet = chanSelector.selectedKeys();
+                final Iterator<SelectionKey> selectionKeyIterator = selectionKeySet.iterator();
 
-                pollForMessage()
-                        .ifPresent(message -> sendMessage(udpSocket, message));
+                while (selectionKeyIterator.hasNext()) {
+                    final SelectionKey key = selectionKeyIterator.next();
 
-                receiveFromSocket(udpSocket)
-                        .ifPresent(this::receiveMessage);
+                    if (key.isReadable()) {
+                        final SocketAddress sender = datagramChannel.receive(incomingPacketBuffer);
+                        Message.bufferToMessage(incomingPacketBuffer)
+                               .filter(message -> message.senderId() != localHostId)
+                               .ifPresent(message -> {
+                                   LOG.info("received message {} from {}", message, sender);
+                                   mainFrame.queueMessageDisplay(message);
+                               });
+                        incomingPacketBuffer.flip();
+                    }
+
+                    if (key.isWritable()) {
+                        pollForMessage()
+                                .flatMap(Message::messageToBuffer)
+                                .ifPresent(outgoingBuffer -> {
+                                    try {
+                                        final int bufferLength = outgoingBuffer.array().length;
+
+                                        int sentBytes = datagramChannel
+                                                .send(outgoingBuffer,
+                                                        new InetSocketAddress(
+                                                                InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
+                                                                TEFLON_PORT));
+
+                                        LOG.debug("sent {} of {} bytes over the wire", sentBytes, bufferLength);
+
+                                        // TODO: signal success back to caller with a future
+                                    } catch (IOException exc) {
+                                        LOG.error("i/o exception while attempting to send", exc);
+                                    }
+                                });
+                    }
+
+                    selectionKeyIterator.remove();
+                }
             }
-        } catch (InterruptedException | IOException exc) {
-            LOG.warn("exception in main event loop: " + exc.getMessage());
-            exc.printStackTrace();
+        } catch (IOException exc) {
+            LOG.error("unexpected exception in main event loop", exc);
         } finally {
             mainFrame.dispose();
         }
     }
 
-    private void receiveMessage(final DatagramPacket datagramPacket) {
-        try {
-            final ObjectInput datagramInput = new ObjectInputStream(new ByteArrayInputStream(datagramPacket.getData()));
-            final Message datagramMessage = (Message) datagramInput.readObject();
-
-            if (localHostId == datagramMessage.senderId()) {
-                LOG.debug("not receiving messages with same sender id as local machine");
-                return;
-            }
-
-            if (!incomingMsgQueue.offer(datagramMessage, IO_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                LOG.warn("timed out offering received message to queue, dropping incoming message");
-            }
-        } catch (IOException | InterruptedException | ClassNotFoundException exc) {
-            exc.printStackTrace();
-        }
+    private DatagramChannel setupSocketChannel() throws IOException {
+        final DatagramChannel channel = DatagramChannel.open();
+        channel.configureBlocking(false);
+        return channel;
     }
 
-    private DatagramSocket setupSocket() throws SocketException {
-        final DatagramSocket udpSocket = new DatagramSocket(TEFLON_PORT);
+    private DatagramSocket setupDatagramSocket(final DatagramChannel datagramChannel) throws SocketException {
+        final DatagramSocket udpSocket = datagramChannel.socket();
+        udpSocket.bind(new InetSocketAddress(TEFLON_PORT));
         udpSocket.setSoTimeout(IO_TIMEOUT_MS);
         udpSocket.setBroadcast(true);
         return udpSocket;
-    }
-
-    private Optional<DatagramPacket> receiveFromSocket(final DatagramSocket udpSocket) {
-        try {
-            final byte[] inputBuffer = new byte[INPUT_BUFFER_LEN];
-            final DatagramPacket inputDatagram = new DatagramPacket(inputBuffer, INPUT_BUFFER_LEN);
-            udpSocket.receive(inputDatagram);
-            return Optional.of(inputDatagram);
-        } catch (final SocketTimeoutException ste) {
-
-            return Optional.empty();
-        } catch (final IOException ioe) {
-            LOG.warn("exception while receiving: " + ioe.getMessage());
-            ioe.printStackTrace();
-            return Optional.empty();
-        }
     }
 
     private Optional<Message> pollForMessage() {
         try {
             return Optional.ofNullable(outgoingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException ie) {
-            LOG.warn("interrupted while polling for messages: " + ie.getMessage());
-            ie.printStackTrace();
+            LOG.warn("interrupted while polling for outgoing messages", ie);
             return Optional.empty();
-        }
-    }
-
-    private void sendMessage(final DatagramSocket udpSocket, Message message) {
-        try {
-            final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            final ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-            objectOutputStream.writeObject(message);
-            final byte[] messageBytes = byteArrayOutputStream.toByteArray();
-
-            final DatagramPacket outgoingPacket = new DatagramPacket(
-                    messageBytes,
-                    messageBytes.length,
-                    InetAddress.getByAddress(TEFLON_SEND_ADDRESS),
-                    TEFLON_PORT);
-
-            udpSocket.send(outgoingPacket);
-        } catch (IOException ioe) {
-            LOG.warn("exception while sending message: " + ioe.getMessage());
-            ioe.printStackTrace();
         }
     }
 }
