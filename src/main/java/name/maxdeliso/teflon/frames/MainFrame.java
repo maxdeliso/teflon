@@ -1,6 +1,9 @@
 package name.maxdeliso.teflon.frames;
 
+import name.maxdeliso.teflon.EventHandler;
 import name.maxdeliso.teflon.data.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -30,6 +33,7 @@ import static name.maxdeliso.teflon.config.Config.TEFLON_WIDTH;
  * @see <a href="https://docs.oracle.com/javase/8/docs/api/javax/swing/JFrame.html">JFrame</a>
  */
 public class MainFrame extends JFrame {
+    private static final Logger LOG = LoggerFactory.getLogger(MainFrame.class);
 
     private final JTextArea outputTextArea = new JTextArea();
     private final JPanel headerPanel = new JPanel();
@@ -54,6 +58,7 @@ public class MainFrame extends JFrame {
     }
 
     private void buildFrame() {
+        LOG.debug("building JFrame");
         headerPanel.setLayout(new BorderLayout());
         outputTextArea.setLineWrap(true);
         outputTextArea.setEditable(false);
@@ -98,6 +103,7 @@ public class MainFrame extends JFrame {
         });
 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        LOG.debug("JFrame built");
     }
 
     /**
@@ -106,6 +112,7 @@ public class MainFrame extends JFrame {
      * @param msg the message to render, typically just received from over UDP.
      */
     public void queueMessageDisplay(final Message msg) {
+        LOG.debug("queueing message for display");
         SwingUtilities.invokeLater(() -> renderMessage(msg, outputTextArea));
     }
 }

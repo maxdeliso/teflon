@@ -2,6 +2,8 @@ package name.maxdeliso.teflon;
 
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.frames.MainFrame;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -28,7 +30,9 @@ import static name.maxdeliso.teflon.config.Config.TEFLON_SEND_ADDRESS;
 /**
  * This class contains the main event loop which checks in memory queues, and performs UDP sending/receiving.
  */
-class EventHandler {
+public class EventHandler {
+    private static final Logger LOG = LoggerFactory.getLogger(EventHandler.class);
+
     private final AtomicBoolean alive;
     private final MainFrame mainFrame;
     private final LinkedBlockingQueue<Message> incomingMsgQueue = new LinkedBlockingQueue<>(BACKLOG_LENGTH);
@@ -69,6 +73,7 @@ class EventHandler {
                         .ifPresent(this::receiveMessage);
             }
         } catch (InterruptedException | IOException exc) {
+            LOG.warn("exception in main event loop: " + exc.getMessage());
             exc.printStackTrace();
         } finally {
             mainFrame.dispose();
@@ -81,12 +86,12 @@ class EventHandler {
             final Message datagramMessage = (Message) datagramInput.readObject();
 
             if (localHostId == datagramMessage.senderId()) {
-                /* Don't receive messages that we ourselves sent */
+                LOG.debug("not receiving messages with same sender id as local machine");
                 return;
             }
 
             if (!incomingMsgQueue.offer(datagramMessage, IO_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-                System.err.println("timed out offering received message to queue... dropping incoming message");
+                LOG.warn("timed out offering received message to queue, dropping incoming message");
             }
         } catch (IOException | InterruptedException | ClassNotFoundException exc) {
             exc.printStackTrace();
@@ -107,8 +112,10 @@ class EventHandler {
             udpSocket.receive(inputDatagram);
             return Optional.of(inputDatagram);
         } catch (final SocketTimeoutException ste) {
+
             return Optional.empty();
         } catch (final IOException ioe) {
+            LOG.warn("exception while receiving: " + ioe.getMessage());
             ioe.printStackTrace();
             return Optional.empty();
         }
@@ -118,6 +125,7 @@ class EventHandler {
         try {
             return Optional.ofNullable(outgoingMsgQueue.poll(IO_TIMEOUT_MS, TimeUnit.MILLISECONDS));
         } catch (InterruptedException ie) {
+            LOG.warn("interrupted while polling for messages: " + ie.getMessage());
             ie.printStackTrace();
             return Optional.empty();
         }
@@ -138,6 +146,7 @@ class EventHandler {
 
             udpSocket.send(outgoingPacket);
         } catch (IOException ioe) {
+            LOG.warn("exception while sending message: " + ioe.getMessage());
             ioe.printStackTrace();
         }
     }
