@@ -5,8 +5,7 @@ import name.maxdeliso.teflon.frames.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -17,7 +16,7 @@ class Main {
 
     private final LinkedBlockingQueue<Message> outgoingMsgQueue = new LinkedBlockingQueue<>(BACKLOG_LENGTH);
     private final AtomicBoolean alive = new AtomicBoolean(true);
-    private final int localHostId = localHostId();
+    private final UUID localHostId = localHostId();
     private final MainFrame mainFrame = new MainFrame(outgoingMsgQueue, alive, localHostId);
     private final EventHandler eventHandler = new EventHandler(alive, mainFrame, outgoingMsgQueue, localHostId);
 
@@ -36,13 +35,7 @@ class Main {
         eventHandler.loop();
     }
 
-    private int localHostId() {
-        try {
-            return InetAddress.getLocalHost().getHostName().hashCode();
-        } catch (UnknownHostException uhe) {
-            LOG.warn("failed to retrieve local host, falling back on predictable id");
-            uhe.printStackTrace();
-            return 0;
-        }
+    private UUID localHostId() {
+       return UUID.randomUUID();
     }
 }

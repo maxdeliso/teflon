@@ -17,6 +17,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -40,11 +41,11 @@ public class MainFrame extends JFrame {
     private final DateFormat dateFormat = DateFormat.getInstance();
     private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final AtomicBoolean alive;
-    private final int localHostId;
+    private final UUID localHostId;
 
     public MainFrame(final LinkedBlockingQueue<Message> outgoingMsgQueue,
                      final AtomicBoolean alive,
-                     final int localHostId) {
+                     final UUID localHostId) {
         this.outgoingMsgQueue = outgoingMsgQueue;
         this.alive = alive;
         this.localHostId = localHostId;

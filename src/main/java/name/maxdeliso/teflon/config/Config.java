@@ -4,7 +4,6 @@ package name.maxdeliso.teflon.config;
  * A class to hold configuration values.
  */
 public final class Config {
-    public static final byte[] TEFLON_SEND_ADDRESS = new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff};
     public static final int TEFLON_PORT = 1337;
     public static final int IO_TIMEOUT_MS = 5;
 
@@ -16,4 +15,6 @@ public final class Config {
     public static final String MESSAGE_SEPARATOR = " >> ";
 
     public static final int BACKLOG_LENGTH = 1024;
+
+    public static final String MULTICAST_GROUP = "FF02:0:0:0:0:0:0:77";
 }
