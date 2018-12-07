@@ -12,26 +12,27 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.UUID;
 
 import static name.maxdeliso.teflon.config.Config.MESSAGE_SEPARATOR;
 
 /**
- * A simple message class with a numeric sender id and a string body.
+ * A simple message class with a sender id and a string body.
  */
 public final class Message implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(Message.class);
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
 
-    private final int senderId;
+    private final UUID senderId;
     private final String body;
 
-    public Message(int senderId, String body) {
+    public Message(UUID senderId, String body) {
         this.senderId = senderId;
         this.body = body;
     }
 
-    public int senderId() {
+    public UUID senderId() {
         return this.senderId;
     }
 
@@ -41,7 +42,7 @@ public final class Message implements Serializable {
 
     @Override
     public String toString() {
-        return String.join(MESSAGE_SEPARATOR, Integer.toHexString(senderId()), body());
+        return String.join(MESSAGE_SEPARATOR, senderId().toString(), body());
     }
 
     public static Optional<Message> bufferToMessage(final ByteBuffer buffer) {
@@ -50,6 +51,7 @@ public final class Message implements Serializable {
             return Optional.of((Message) datagramInput.readObject());
         } catch (final IOException | ClassNotFoundException exc) {
             LOG.warn("failed to deserialize buffer {}", buffer, exc);
+            buffer.clear();
             return Optional.empty();
         }
     }
