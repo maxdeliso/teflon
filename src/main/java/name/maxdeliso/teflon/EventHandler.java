@@ -69,19 +69,9 @@ class EventHandler {
             final Selector datagramChanSelector = Selector.open()) {
             datagramChannel.register(datagramChanSelector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
             final ByteBuffer incomingPacketBuffer = ByteBuffer.allocate(INPUT_BUFFER_LEN);
-
             final InetAddress group = InetAddress.getByName(MULTICAST_GROUP);
 
-            Message.messageToBuffer(new Message(localHostId, "joined"))
-                   .ifPresent(bb -> {
-                        try {
-                            datagramChannel.send(
-                                    bb,
-                                    new InetSocketAddress(group, TEFLON_PORT));
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                   });
+            broadcast(datagramChannel, group, localHostId, "joined");
 
             while (alive.get()) {
                 datagramChanSelector.select(IO_TIMEOUT_MS);
@@ -127,11 +117,29 @@ class EventHandler {
                     selectionKeyIterator.remove();
                 }
             }
+
+            broadcast(datagramChannel, group, localHostId, "parted");
         } catch (IOException exc) {
             LOG.error("unexpected exception in main event loop", exc);
         } finally {
             mainFrame.dispose();
         }
+    }
+
+    private void broadcast(final DatagramChannel datagramChannel,
+                           final InetAddress group,
+                           final UUID localHostId,
+                           final String broadcastMessage) {
+        Message.messageToBuffer(new Message(localHostId, broadcastMessage))
+                .ifPresent(bb -> {
+                    try {
+                        datagramChannel.send(
+                                bb,
+                                new InetSocketAddress(group, TEFLON_PORT));
+                    } catch (IOException ioe) {
+                        LOG.warn("send failed", ioe);
+                    }
+                });
     }
 
     private DatagramChannel setupDatagramChannel() throws IOException {
