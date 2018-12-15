@@ -24,7 +24,7 @@ class Main {
         mainFrame.setVisible(true);
     }
 
-    public static void main(String args[]) {
+    public static void main(String[] args) {
         final Main main = new Main();
         LOG.debug("entering main loop");
         main.loop();
