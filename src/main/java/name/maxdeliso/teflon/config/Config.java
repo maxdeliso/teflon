@@ -1,20 +1,35 @@
 package name.maxdeliso.teflon.config;
 
-/**
- * A class to hold configuration values.
- */
-public final class Config {
-    public static final int TEFLON_PORT = 1337;
-    public static final int IO_TIMEOUT_MS = 5;
+public class Config {
+    private int udpPort;
 
-    public static final int INPUT_BUFFER_LEN = 4096;
-    public static final int TEFLON_WIDTH = 512;
-    public static final int TEFLON_HEIGHT = 316;
-    public static final String TEFLON_TITLE = "Teflon";
+    private int inputBufferLength;
 
-    public static final String MESSAGE_SEPARATOR = " >> ";
+    private String messageSeparator;
 
-    public static final int BACKLOG_LENGTH = 1024;
+    private int backlogLength;
 
-    public static final String MULTICAST_GROUP = "FF02:0:0:0:0:0:0:77";
+    private String multicastGroup;
+
+    private String interfaceName;
+
+    public int getUdpPort() {
+        return udpPort;
+    }
+
+    public int getBacklogLength() {
+        return backlogLength;
+    }
+
+    public String getMulticastGroup() {
+        return multicastGroup;
+    }
+
+    public String getInterfaceName() {
+        return interfaceName;
+    }
+
+    public int getInputBufferLength() {
+        return inputBufferLength;
+    }
 }

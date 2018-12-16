@@ -17,13 +17,8 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.text.DateFormat;
 import java.util.Date;
-import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static name.maxdeliso.teflon.config.Config.TEFLON_HEIGHT;
-import static name.maxdeliso.teflon.config.Config.TEFLON_TITLE;
-import static name.maxdeliso.teflon.config.Config.TEFLON_WIDTH;
 
 /**
  * A JFrame, which will present a UI through the native windowing system on supported OSes.
@@ -35,17 +30,23 @@ import static name.maxdeliso.teflon.config.Config.TEFLON_WIDTH;
 public class MainFrame extends JFrame {
     private static final Logger LOG = LoggerFactory.getLogger(MainFrame.class);
 
+    private static final int FRAME_WIDTH = 512;
+
+    private static final int FRAME_HEIGHT = 316;
+
+    private static final String FRAME_TITLE = "Teflon";
+
     private final JTextArea outputTextArea = new JTextArea();
     private final JPanel headerPanel = new JPanel();
     private final JTextField inputTextField = new JTextField();
     private final DateFormat dateFormat = DateFormat.getInstance();
     private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final AtomicBoolean alive;
-    private final UUID localHostId;
+    private final String localHostId;
 
     public MainFrame(final LinkedBlockingQueue<Message> outgoingMsgQueue,
                      final AtomicBoolean alive,
-                     final UUID localHostId) {
+                     final String localHostId) {
         this.outgoingMsgQueue = outgoingMsgQueue;
         this.alive = alive;
         this.localHostId = localHostId;
@@ -72,7 +73,6 @@ public class MainFrame extends JFrame {
                     try {
                         outgoingMsgQueue.put(outgoingMessage);
                     } catch (InterruptedException ie) {
-                        ie.printStackTrace();
                         alive.set(false);
                     }
 
@@ -82,8 +82,8 @@ public class MainFrame extends JFrame {
             }
         });
 
-        setSize(TEFLON_WIDTH, TEFLON_HEIGHT);
-        setTitle(TEFLON_TITLE);
+        setSize(FRAME_WIDTH, FRAME_HEIGHT);
+        setTitle(FRAME_TITLE);
         setLayout(new BorderLayout());
 
         add(BorderLayout.PAGE_START, headerPanel);

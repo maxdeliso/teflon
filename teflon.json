@@ -1,0 +1,7 @@
+{
+  "udpPort": 1337,
+  "inputBufferLength": 4096,
+  "backlogLength": 1024,
+  "multicastGroup": "FF02:0:0:0:0:0:0:77",
+  "interfaceName": "eth6"
+}
