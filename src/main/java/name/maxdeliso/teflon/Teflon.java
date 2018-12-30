@@ -64,8 +64,7 @@ class Teflon {
         switch (arguments.getMode()) {
             case "L": // lists available network interfaces
                 try {
-                    for (NetworkInterface ni :
-                            Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                    for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                         LOG.info("{} - {}", ni.getName(), ni.toString());
                     }
                 } catch (final SocketException se) {
@@ -75,7 +74,7 @@ class Teflon {
 
 
             case "R": // runs the program
-                final Config config = configLoader
+                final var config = configLoader
                         .loadFromFile(CONFIG_PATH)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "failed to locate and load config file at: " + CONFIG_PATH));
@@ -84,7 +83,7 @@ class Teflon {
 
                 try {
                     teflon.mainFrame.setVisible(true);
-                    teflon.netSelector.select();
+                    teflon.netSelector.selectLoop();
                 } finally {
                     teflon.mainFrame.dispose();
                 }

@@ -7,11 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
-import java.net.SocketAddress;
 import java.net.StandardProtocolFamily;
 import java.net.StandardSocketOptions;
 import java.net.UnknownHostException;
@@ -20,13 +18,12 @@ import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * This class contains the main event select which checks in memory queues, and performs UDP sending/receiving.
+ * This class contains the main event selectLoop which checks in memory queues, and performs UDP sending/receiving.
  */
 public class NetSelector {
     private static final Logger LOG = LoggerFactory.getLogger(NetSelector.class);
@@ -75,10 +72,10 @@ public class NetSelector {
     }
 
     /**
-     * Main event processing select. This function busies the calling thread with the task of continual sending
+     * Main event processing selectLoop. This function busies the calling thread with the task of continual sending
      * and receiving as data arrives.
      */
-    public void select() {
+    public void selectLoop() {
         try (final DatagramChannel datagramChannel = setupDatagramChannel();
              final Selector datagramChanSelector = Selector.open()) {
 
@@ -103,7 +100,7 @@ public class NetSelector {
                 }
             }
         } catch (IOException exc) {
-            LOG.error("unexpected exception in main event select", exc);
+            LOG.error("unexpected exception in main event selectLoop", exc);
         }
     }
 
