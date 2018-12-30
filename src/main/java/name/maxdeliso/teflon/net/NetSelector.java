@@ -67,7 +67,7 @@ public class NetSelector {
         this.config = config;
         this.messageMarshaller = messageMarshaller;
 
-        final InetAddress multicastGroupAddress = InetAddress.getByName(config.getMulticastGroup());
+        final var multicastGroupAddress = InetAddress.getByName(config.getMulticastGroup());
 
         this.incomingBuffer = ByteBuffer.allocate(config.getInputBufferLength());
         this.multicastSendSocketAddress = new InetSocketAddress(multicastGroupAddress, config.getUdpPort());
@@ -86,7 +86,7 @@ public class NetSelector {
 
             while (alive.get()) {
                 datagramChanSelector.select(0);
-                final Set<SelectionKey> selectionKeySet = datagramChanSelector.selectedKeys();
+                final var selectionKeySet = datagramChanSelector.selectedKeys();
 
                 for (final SelectionKey key : selectionKeySet) {
                     if (key.isReadable()) {
@@ -109,15 +109,15 @@ public class NetSelector {
 
     private boolean handleRead(final DatagramChannel datagramChannel) throws IOException {
         incomingBuffer.clear();
-        final SocketAddress sender = datagramChannel.receive(incomingBuffer);
-        byte[] receivedBytes = new byte[incomingBuffer.position()];
+        var sender = datagramChannel.receive(incomingBuffer);
+        var receivedBytes = new byte[incomingBuffer.position()];
         incomingBuffer.rewind();
         incomingBuffer.get(receivedBytes);
 
         return messageMarshaller
                 .bufferToMessage(receivedBytes)
                 .filter(message -> {
-                    boolean isLocal = localHostId.compareTo(message.senderId()) == 0;
+                    var isLocal = localHostId.compareTo(message.senderId()) == 0;
                     return !isLocal;
                 })
                 .map(message -> {
@@ -133,8 +133,8 @@ public class NetSelector {
                 .map(messageMarshaller::messageToBuffer)
                 .map(outgoingBuffer -> {
                     try {
-                        final int bufferLength = outgoingBuffer.array().length;
-                        final int sentBytes = datagramChannel.send(outgoingBuffer, multicastSendSocketAddress);
+                        final var bufferLength = outgoingBuffer.array().length;
+                        final var sentBytes = datagramChannel.send(outgoingBuffer, multicastSendSocketAddress);
                         LOG.debug("sent {} of {} bytes over the wire", sentBytes, bufferLength);
                         return bufferLength == sentBytes;
                     } catch (IOException exc) {
@@ -146,14 +146,14 @@ public class NetSelector {
     }
 
     private DatagramChannel setupDatagramChannel() throws IOException {
-        final DatagramChannel channel = DatagramChannel.open(StandardProtocolFamily.INET6);
-        final NetworkInterface multicastInterface = NetworkInterface.getByName(config.getInterfaceName());
-        final InetAddress group = InetAddress.getByName(config.getMulticastGroup());
+        final var channel = DatagramChannel.open(StandardProtocolFamily.INET6);
+        final var multicastInterface = NetworkInterface.getByName(config.getInterfaceName());
+        final var group = InetAddress.getByName(config.getMulticastGroup());
 
         channel.setOption(StandardSocketOptions.IP_MULTICAST_IF, multicastInterface);
         channel.configureBlocking(false);
 
-        final DatagramSocket udpSocket = channel.socket();
+        final var udpSocket = channel.socket();
 
         udpSocket.setReuseAddress(true);
         udpSocket.setBroadcast(true);

@@ -54,7 +54,7 @@ public class MainFrame extends JFrame {
     }
 
     private void renderMessage(final Message msg, final JTextArea outputArea) {
-        final String timeString = dateFormat.format(new Date());
+        final var timeString = dateFormat.format(new Date());
         outputArea.append(timeString + " : " + msg.toString() + "\n");
     }
 
@@ -68,15 +68,15 @@ public class MainFrame extends JFrame {
             @Override
             public void keyReleased(final KeyEvent ke) {
                 if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-                    Message outgoingMessage = new Message(localHostId, inputTextField.getText());
+                    var outgoing = new Message(localHostId, inputTextField.getText());
 
                     try {
-                        outgoingMsgQueue.put(outgoingMessage);
+                        outgoingMsgQueue.put(outgoing);
                     } catch (InterruptedException ie) {
                         alive.set(false);
                     }
 
-                    renderMessage(outgoingMessage, outputTextArea);
+                    renderMessage(outgoing, outputTextArea);
                     inputTextField.setText("");
                 }
             }

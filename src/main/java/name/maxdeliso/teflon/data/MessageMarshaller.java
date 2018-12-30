@@ -26,7 +26,7 @@ public class MessageMarshaller {
 
     public Optional<Message> bufferToMessage(final byte[] buffer) {
         try (final ByteArrayInputStream inputStream = new ByteArrayInputStream(buffer);
-             final InputStreamReader isr = new InputStreamReader(inputStream, MESSAGE_CHARSET)) {
+             final var isr = new InputStreamReader(inputStream, MESSAGE_CHARSET)) {
             return Optional.ofNullable(gson.fromJson(isr, Message.class));
         } catch (IOException | JsonSyntaxException exc) {
             LOG.warn("failed to deserialize buffer {}", buffer, exc);

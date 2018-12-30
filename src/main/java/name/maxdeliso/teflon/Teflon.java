@@ -38,7 +38,7 @@ class Teflon {
                 alive,
                 localHostId);
 
-        final MessageMarshaller messageMarshaller = new MessageMarshaller(GSON);
+        final var messageMarshaller = new MessageMarshaller(GSON);
 
         netSelector = new NetSelector(
                 alive,
@@ -50,8 +50,8 @@ class Teflon {
     }
 
     public static void main(String[] args) throws UnknownHostException {
-        final Arguments arguments = new Arguments();
-        final JCommander jc = new JCommander();
+        final var arguments = new Arguments();
+        final var jc = new JCommander();
 
         jc.addObject(arguments);
         jc.parse(args);
@@ -80,7 +80,7 @@ class Teflon {
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "failed to locate and load config file at: " + CONFIG_PATH));
 
-                final Teflon teflon = new Teflon(config);
+                final var teflon = new Teflon(config);
 
                 try {
                     teflon.mainFrame.setVisible(true);

@@ -10,8 +10,7 @@ class Arguments {
     @Parameter(names = "--mode", description = "the run mode, one of L or R")
     private String mode;
 
-    @Parameter(names = "--help",
-            help = true)
+    @Parameter(names = "--help", help = true)
     private boolean help;
 
     String getMode() {
