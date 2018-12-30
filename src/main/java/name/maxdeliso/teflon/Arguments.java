@@ -5,9 +5,10 @@ import com.beust.jcommander.Parameter;
 /**
  * Command line arguments.
  */
+@SuppressWarnings({"unused"})
 class Arguments {
     @Parameter(names = "--mode", description = "the run mode, one of L or R")
-    private String mode = "R";
+    private String mode;
 
     @Parameter(names = "--help",
             help = true)

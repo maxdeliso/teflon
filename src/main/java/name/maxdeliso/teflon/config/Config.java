@@ -1,5 +1,6 @@
 package name.maxdeliso.teflon.config;
 
+@SuppressWarnings("unused")
 public class Config {
     private int udpPort;
 

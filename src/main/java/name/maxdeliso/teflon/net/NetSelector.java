@@ -1,6 +1,5 @@
 package name.maxdeliso.teflon.net;
 
-import com.google.gson.Gson;
 import name.maxdeliso.teflon.config.Config;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageMarshaller;
@@ -47,12 +46,12 @@ public class NetSelector {
      * Alternates between draining the outgoing message queue and receiving Messages and transferring
      * to the incoming message consumer.
      *
-     * @param alive a flag that can be used to signal termination.
+     * @param alive                   a flag that can be used to signal termination.
      * @param incomingMessageConsumer a function to process incoming messages.
-     * @param outgoingMsgQueue an in-memory queue of messages that is drained into the network.
-     * @param localHostId the current node's UUID.
-     * @param config application level config.
-     * @param messageMarshaller a marshaller for Messages.
+     * @param outgoingMsgQueue        an in-memory queue of messages that is drained into the network.
+     * @param localHostId             the current node's UUID.
+     * @param config                  application level config.
+     * @param messageMarshaller       a marshaller for Messages.
      * @throws UnknownHostException if the configured address couldn't be resolved.
      */
     public NetSelector(final AtomicBoolean alive,
@@ -91,13 +90,13 @@ public class NetSelector {
 
                 for (final SelectionKey key : selectionKeySet) {
                     if (key.isReadable()) {
-                        if(!handleRead(datagramChannel)) {
+                        if (!handleRead(datagramChannel)) {
                             LOG.trace("read operation did not enqueue a message for display");
                         }
                     }
 
                     if (key.isWritable()) {
-                        if(!handleWrite(datagramChannel)) {
+                        if (!handleWrite(datagramChannel)) {
                             LOG.trace("write did not send a message to the multicast address");
                         }
                     }

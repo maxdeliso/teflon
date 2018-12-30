@@ -16,7 +16,7 @@ import java.util.Optional;
 public class MessageMarshaller {
     private static final Logger LOG = LoggerFactory.getLogger(MessageMarshaller.class);
 
-    private static Charset MESSAGE_CHARSET = StandardCharsets.UTF_8;
+    private static final Charset MESSAGE_CHARSET = StandardCharsets.UTF_8;
 
     private final Gson gson;
 

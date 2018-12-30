@@ -7,8 +7,8 @@ import name.maxdeliso.teflon.config.Config;
 import name.maxdeliso.teflon.config.ConfigLoader;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageMarshaller;
-import name.maxdeliso.teflon.ui.MainFrame;
 import name.maxdeliso.teflon.net.NetSelector;
+import name.maxdeliso.teflon.ui.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,7 +24,7 @@ class Teflon {
     private static final Logger LOG = LoggerFactory.getLogger(Teflon.class);
     private static final Gson GSON = new GsonBuilder().create();
     private static final String CONFIG_PATH = "teflon.json";
-    private static ConfigLoader configLoader = new ConfigLoader(GSON);
+    private static final ConfigLoader configLoader = new ConfigLoader(GSON);
     private final NetSelector netSelector;
     private final MainFrame mainFrame;
 
@@ -64,7 +64,7 @@ class Teflon {
         switch (arguments.getMode()) {
             case "L": // lists available network interfaces
                 try {
-                    for(NetworkInterface ni :
+                    for (NetworkInterface ni :
                             Collections.list(NetworkInterface.getNetworkInterfaces())) {
                         LOG.info("{} - {}", ni.getName(), ni.toString());
                     }
@@ -89,6 +89,9 @@ class Teflon {
                     teflon.mainFrame.dispose();
                 }
                 break;
+
+            default:
+                LOG.error("unrecognized mode: {}", arguments.getMode());
         }
     }
 }
