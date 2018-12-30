@@ -7,10 +7,10 @@ import com.beust.jcommander.Parameter;
  */
 @SuppressWarnings({"unused"})
 class Arguments {
-    @Parameter(names = "--mode", description = "the run mode, one of L or R")
+    @Parameter(names = {"--mode", "-m"}, description = "the run mode, one of L[ist interfaces] or R[un]")
     private String mode;
 
-    @Parameter(names = "--help", help = true)
+    @Parameter(names = {"--help", "-h"}, help = true)
     private boolean help;
 
     String getMode() {

@@ -1,8 +1,6 @@
 package name.maxdeliso.teflon.net;
 
 import name.maxdeliso.teflon.config.Config;
-import name.maxdeliso.teflon.data.Message;
-import name.maxdeliso.teflon.data.MessageMarshaller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,17 +8,17 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.net.StandardProtocolFamily;
 import java.net.StandardSocketOptions;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Optional;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /**
  * This class contains the main event selectLoop which checks in memory queues, and performs UDP sending/receiving.
@@ -29,46 +27,28 @@ public class NetSelector {
     private static final Logger LOG = LoggerFactory.getLogger(NetSelector.class);
 
     private final AtomicBoolean alive;
-    private final LinkedBlockingQueue<Message> outgoingMsgQueue;
-    private final String localHostId;
-    private final Config config;
-
-    private final MessageMarshaller messageMarshaller;
     private final ByteBuffer incomingBuffer;
     private final InetSocketAddress multicastSendSocketAddress;
     private final InetSocketAddress multicastListenSocketAddress;
-    private final Consumer<Message> incomingMessageConsumer;
+    private final BiConsumer<SocketAddress, byte[]> incomingByteBufferConsumer;
+    private final InetAddress multicastGroupAddress;
+    private final NetworkInterface multicastInterface;
+    private final Supplier<ByteBuffer> outgoingMessageSupplier;
 
-    /**
-     * Alternates between draining the outgoing message queue and receiving Messages and transferring
-     * to the incoming message consumer.
-     *
-     * @param alive                   a flag that can be used to signal termination.
-     * @param incomingMessageConsumer a function to process incoming messages.
-     * @param outgoingMsgQueue        an in-memory queue of messages that is drained into the network.
-     * @param localHostId             the current node's UUID.
-     * @param config                  application level config.
-     * @param messageMarshaller       a marshaller for Messages.
-     * @throws UnknownHostException if the configured address couldn't be resolved.
-     */
     public NetSelector(final AtomicBoolean alive,
-                       final Consumer<Message> incomingMessageConsumer,
-                       final LinkedBlockingQueue<Message> outgoingMsgQueue,
-                       final String localHostId,
-                       final Config config,
-                       final MessageMarshaller messageMarshaller) throws UnknownHostException {
+                       final BiConsumer<SocketAddress, byte[]> incomingByteBufferConsumer,
+                       final InetAddress multicastGroupAddress,
+                       final NetworkInterface multicastInterface,
+                       final Supplier<ByteBuffer> outgoingDataSupplier,
+                       final Config config) {
         this.alive = alive;
-        this.incomingMessageConsumer = incomingMessageConsumer;
-        this.outgoingMsgQueue = outgoingMsgQueue;
-        this.localHostId = localHostId;
-        this.config = config;
-        this.messageMarshaller = messageMarshaller;
-
-        final var multicastGroupAddress = InetAddress.getByName(config.getMulticastGroup());
-
+        this.incomingByteBufferConsumer = incomingByteBufferConsumer;
+        this.multicastGroupAddress = multicastGroupAddress;
+        this.multicastInterface = multicastInterface;
         this.incomingBuffer = ByteBuffer.allocate(config.getInputBufferLength());
         this.multicastSendSocketAddress = new InetSocketAddress(multicastGroupAddress, config.getUdpPort());
         this.multicastListenSocketAddress = new InetSocketAddress(config.getUdpPort());
+        this.outgoingMessageSupplier = outgoingDataSupplier;
     }
 
     /**
@@ -87,15 +67,33 @@ public class NetSelector {
 
                 for (final SelectionKey key : selectionKeySet) {
                     if (key.isReadable()) {
-                        if (!handleRead(datagramChannel)) {
-                            LOG.trace("read operation did not enqueue a message for display");
-                        }
+                        incomingBuffer.clear();
+                        var sender = datagramChannel.receive(incomingBuffer);
+                        var receivedBytes = new byte[incomingBuffer.position()];
+                        incomingBuffer.rewind();
+                        incomingBuffer.get(receivedBytes);
+
+                        // NOTE: heavy compute in incoming consumer will add latency
+                        incomingByteBufferConsumer.accept(sender, receivedBytes);
                     }
 
                     if (key.isWritable()) {
-                        if (!handleWrite(datagramChannel)) {
-                            LOG.trace("write did not send a message to the multicast address");
-                        }
+                        boolean writeSucceeded = Optional.ofNullable(outgoingMessageSupplier.get())
+                                .map(bufferToSend -> {
+                                    try {
+                                        final var bufferLength = bufferToSend.array().length;
+                                        final var sentBytes = datagramChannel
+                                                .send(bufferToSend, multicastSendSocketAddress);
+                                        LOG.debug("sent {} of {} bytes over the wire", sentBytes, bufferLength);
+                                        return bufferLength == sentBytes;
+                                    } catch (IOException exc) {
+                                        LOG.error("i/o exception while attempting to send", exc);
+                                        return false;
+                                    }
+                                })
+                                .orElse(false);
+
+                        LOG.trace("write success flag: {}", writeSucceeded);
                     }
                 }
             }
@@ -104,48 +102,8 @@ public class NetSelector {
         }
     }
 
-    private boolean handleRead(final DatagramChannel datagramChannel) throws IOException {
-        incomingBuffer.clear();
-        var sender = datagramChannel.receive(incomingBuffer);
-        var receivedBytes = new byte[incomingBuffer.position()];
-        incomingBuffer.rewind();
-        incomingBuffer.get(receivedBytes);
-
-        return messageMarshaller
-                .bufferToMessage(receivedBytes)
-                .filter(message -> {
-                    var isLocal = localHostId.compareTo(message.senderId()) == 0;
-                    return !isLocal;
-                })
-                .map(message -> {
-                    LOG.info("received and parsed non local message {} from {}", message, sender);
-                    incomingMessageConsumer.accept(message);
-                    return true;
-                })
-                .orElse(false);
-    }
-
-    private boolean handleWrite(final DatagramChannel datagramChannel) {
-        return Optional.ofNullable(outgoingMsgQueue.poll())
-                .map(messageMarshaller::messageToBuffer)
-                .map(outgoingBuffer -> {
-                    try {
-                        final var bufferLength = outgoingBuffer.array().length;
-                        final var sentBytes = datagramChannel.send(outgoingBuffer, multicastSendSocketAddress);
-                        LOG.debug("sent {} of {} bytes over the wire", sentBytes, bufferLength);
-                        return bufferLength == sentBytes;
-                    } catch (IOException exc) {
-                        LOG.error("i/o exception while attempting to send", exc);
-                        return false;
-                    }
-                })
-                .orElse(false);
-    }
-
     private DatagramChannel setupDatagramChannel() throws IOException {
         final var channel = DatagramChannel.open(StandardProtocolFamily.INET6);
-        final var multicastInterface = NetworkInterface.getByName(config.getInterfaceName());
-        final var group = InetAddress.getByName(config.getMulticastGroup());
 
         channel.setOption(StandardSocketOptions.IP_MULTICAST_IF, multicastInterface);
         channel.configureBlocking(false);
@@ -156,7 +114,7 @@ public class NetSelector {
         udpSocket.setBroadcast(true);
         udpSocket.bind(multicastListenSocketAddress);
 
-        channel.join(group, multicastInterface);
+        channel.join(multicastGroupAddress, multicastInterface);
         return channel;
     }
 }
