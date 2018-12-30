@@ -1,4 +1,4 @@
-package name.maxdeliso.teflon.frames;
+package name.maxdeliso.teflon.ui;
 
 import name.maxdeliso.teflon.data.Message;
 import org.slf4j.Logger;

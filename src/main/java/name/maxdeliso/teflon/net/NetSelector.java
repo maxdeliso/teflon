@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import name.maxdeliso.teflon.config.Config;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageMarshaller;
-import name.maxdeliso.teflon.frames.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,62 +15,74 @@ import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.net.StandardProtocolFamily;
 import java.net.StandardSocketOptions;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
-import java.nio.channels.MembershipKey;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
- * This class contains the main event loop which checks in memory queues, and performs UDP sending/receiving.
+ * This class contains the main event select which checks in memory queues, and performs UDP sending/receiving.
  */
 public class NetSelector {
     private static final Logger LOG = LoggerFactory.getLogger(NetSelector.class);
 
     private final AtomicBoolean alive;
-    private final MainFrame mainFrame;
     private final LinkedBlockingQueue<Message> outgoingMsgQueue;
     private final String localHostId;
     private final Config config;
 
     private final MessageMarshaller messageMarshaller;
+    private final ByteBuffer incomingBuffer;
+    private final InetSocketAddress multicastSendSocketAddress;
+    private final InetSocketAddress multicastListenSocketAddress;
+    private final Consumer<Message> incomingMessageConsumer;
 
     /**
-     * The NetSelector constructor.
+     * Alternates between draining the outgoing message queue and receiving Messages and transferring
+     * to the incoming message consumer.
      *
-     * @param alive            a flag which is set from AWT threads to signal graceful shutdown.
-     * @param mainFrame        an AWT frame to display the frontend.
-     * @param outgoingMsgQueue a message queue to hold messages prior to sending them over the network.
-     * @param localHostId      a host identifier.
-     * @param gson             a JSON parsing object.
+     * @param alive a flag that can be used to signal termination.
+     * @param incomingMessageConsumer a function to process incoming messages.
+     * @param outgoingMsgQueue an in-memory queue of messages that is drained into the network.
+     * @param localHostId the current node's UUID.
+     * @param config application level config.
+     * @param messageMarshaller a marshaller for Messages.
+     * @throws UnknownHostException if the configured address couldn't be resolved.
      */
     public NetSelector(final AtomicBoolean alive,
-                       final MainFrame mainFrame,
+                       final Consumer<Message> incomingMessageConsumer,
                        final LinkedBlockingQueue<Message> outgoingMsgQueue,
                        final String localHostId,
                        final Config config,
-                       final Gson gson) {
+                       final MessageMarshaller messageMarshaller) throws UnknownHostException {
         this.alive = alive;
-        this.mainFrame = mainFrame;
+        this.incomingMessageConsumer = incomingMessageConsumer;
         this.outgoingMsgQueue = outgoingMsgQueue;
         this.localHostId = localHostId;
         this.config = config;
-        this.messageMarshaller = new MessageMarshaller(gson);
+        this.messageMarshaller = messageMarshaller;
+
+        final InetAddress multicastGroupAddress = InetAddress.getByName(config.getMulticastGroup());
+
+        this.incomingBuffer = ByteBuffer.allocate(config.getInputBufferLength());
+        this.multicastSendSocketAddress = new InetSocketAddress(multicastGroupAddress, config.getUdpPort());
+        this.multicastListenSocketAddress = new InetSocketAddress(config.getUdpPort());
     }
 
     /**
-     * Main event processing loop.
+     * Main event processing select. This function busies the calling thread with the task of continual sending
+     * and receiving as data arrives.
      */
-    public void loop() {
-        final ByteBuffer incomingPacketBuffer = ByteBuffer.allocate(config.getInputBufferLength());
-
+    public void select() {
         try (final DatagramChannel datagramChannel = setupDatagramChannel();
              final Selector datagramChanSelector = Selector.open()) {
-            final InetAddress group = InetAddress.getByName(config.getMulticastGroup());
+
             datagramChannel.register(datagramChanSelector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
             while (alive.get()) {
@@ -80,68 +91,60 @@ public class NetSelector {
 
                 for (final SelectionKey key : selectionKeySet) {
                     if (key.isReadable()) {
-                        handleRead(incomingPacketBuffer, datagramChannel);
+                        if(!handleRead(datagramChannel)) {
+                            LOG.trace("read operation did not enqueue a message for display");
+                        }
                     }
 
                     if (key.isWritable()) {
-                        handleWrite(datagramChannel, group);
+                        if(!handleWrite(datagramChannel)) {
+                            LOG.trace("write did not send a message to the multicast address");
+                        }
                     }
                 }
             }
         } catch (IOException exc) {
-            LOG.error("unexpected exception in main event loop", exc);
-        } finally {
-            mainFrame.dispose();
+            LOG.error("unexpected exception in main event select", exc);
         }
     }
 
-    private void handleRead(final ByteBuffer incomingPacketBuffer,
-                            final DatagramChannel datagramChannel) throws IOException {
-        final SocketAddress sender = datagramChannel.receive(incomingPacketBuffer);
-        incomingPacketBuffer.flip();
-        byte[] receivedBytes = new byte[incomingPacketBuffer.limit()];
-        incomingPacketBuffer.get(receivedBytes);
-        incomingPacketBuffer.clear();
+    private boolean handleRead(final DatagramChannel datagramChannel) throws IOException {
+        incomingBuffer.clear();
+        final SocketAddress sender = datagramChannel.receive(incomingBuffer);
+        byte[] receivedBytes = new byte[incomingBuffer.position()];
+        incomingBuffer.rewind();
+        incomingBuffer.get(receivedBytes);
 
-        messageMarshaller
+        return messageMarshaller
                 .bufferToMessage(receivedBytes)
                 .filter(message -> {
-                    final String senderId = message.senderId();
-
-                    boolean isLocal = localHostId.compareTo(senderId) == 0;
-
-                    LOG.debug("received message with sender id {}, local id is {}, equality {}",
-                            senderId, localHostId, isLocal);
-
+                    boolean isLocal = localHostId.compareTo(message.senderId()) == 0;
                     return !isLocal;
                 })
-                .ifPresent(message -> {
-                    LOG.info("received non local message {} from {}", message, sender);
-                    mainFrame.queueMessageDisplay(message);
-                });
-
-
+                .map(message -> {
+                    LOG.info("received and parsed non local message {} from {}", message, sender);
+                    incomingMessageConsumer.accept(message);
+                    return true;
+                })
+                .orElse(false);
     }
 
-    private void handleWrite(
-            final DatagramChannel datagramChannel,
-            final InetAddress group) {
-        Optional.ofNullable(outgoingMsgQueue.poll())
+    private boolean handleWrite(final DatagramChannel datagramChannel) {
+        return Optional.ofNullable(outgoingMsgQueue.poll())
                 .map(messageMarshaller::messageToBuffer)
-                .ifPresent(outgoingBuffer -> {
+                .map(outgoingBuffer -> {
                     try {
                         final int bufferLength = outgoingBuffer.array().length;
-
-                        int sentBytes = datagramChannel
-                                .send(outgoingBuffer, new InetSocketAddress(group, config.getUdpPort()));
-
+                        final int sentBytes = datagramChannel.send(outgoingBuffer, multicastSendSocketAddress);
                         LOG.debug("sent {} of {} bytes over the wire", sentBytes, bufferLength);
+                        return bufferLength == sentBytes;
                     } catch (IOException exc) {
                         LOG.error("i/o exception while attempting to send", exc);
+                        return false;
                     }
-                });
+                })
+                .orElse(false);
     }
-
 
     private DatagramChannel setupDatagramChannel() throws IOException {
         final DatagramChannel channel = DatagramChannel.open(StandardProtocolFamily.INET6);
@@ -155,11 +158,9 @@ public class NetSelector {
 
         udpSocket.setReuseAddress(true);
         udpSocket.setBroadcast(true);
-        udpSocket.bind(new InetSocketAddress(config.getUdpPort()));
+        udpSocket.bind(multicastListenSocketAddress);
 
-        final MembershipKey key = channel.join(group, multicastInterface);
-        LOG.debug("joined group {}", key);
-
+        channel.join(group, multicastInterface);
         return channel;
     }
 }

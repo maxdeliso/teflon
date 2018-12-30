@@ -59,7 +59,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>name.maxdeliso.teflon.Main</mainClass>
+                            <mainClass>name.maxdeliso.teflon.Teflon</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

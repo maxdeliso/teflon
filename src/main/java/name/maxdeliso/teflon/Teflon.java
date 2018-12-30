@@ -6,38 +6,50 @@ import com.google.gson.GsonBuilder;
 import name.maxdeliso.teflon.config.Config;
 import name.maxdeliso.teflon.config.ConfigLoader;
 import name.maxdeliso.teflon.data.Message;
+import name.maxdeliso.teflon.data.MessageMarshaller;
+import name.maxdeliso.teflon.ui.MainFrame;
 import name.maxdeliso.teflon.net.NetSelector;
-import name.maxdeliso.teflon.frames.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Collections;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-class Main {
-    private static final Logger LOG = LoggerFactory.getLogger(Main.class);
+class Teflon {
+    private static final Logger LOG = LoggerFactory.getLogger(Teflon.class);
     private static final Gson GSON = new GsonBuilder().create();
     private static final String CONFIG_PATH = "teflon.json";
     private static ConfigLoader configLoader = new ConfigLoader(GSON);
-    private final LinkedBlockingQueue<Message> outgoingMsgQueue;
-    private final AtomicBoolean alive = new AtomicBoolean(true);
-    private final String localHostId = UUID.randomUUID().toString();
-    private final MainFrame mainFrame;
     private final NetSelector netSelector;
+    private final MainFrame mainFrame;
 
-    private Main(Config config) {
-        outgoingMsgQueue = new LinkedBlockingQueue<>(config.getBacklogLength());
-        mainFrame = new MainFrame(outgoingMsgQueue, alive, localHostId);
-        netSelector = new NetSelector(alive, mainFrame, outgoingMsgQueue, localHostId, config, GSON);
-        mainFrame.setVisible(true);
+    private Teflon(Config config) throws UnknownHostException {
+        final LinkedBlockingQueue<Message> outgoingMsgQueue = new LinkedBlockingQueue<>(config.getBacklogLength());
+        final AtomicBoolean alive = new AtomicBoolean(true);
+        final String localHostId = UUID.randomUUID().toString();
+
+        mainFrame = new MainFrame(
+                outgoingMsgQueue,
+                alive,
+                localHostId);
+
+        final MessageMarshaller messageMarshaller = new MessageMarshaller(GSON);
+
+        netSelector = new NetSelector(
+                alive,
+                (mainFrame::queueMessageDisplay),
+                outgoingMsgQueue,
+                localHostId,
+                config,
+                messageMarshaller);
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws UnknownHostException {
         final Arguments arguments = new Arguments();
         final JCommander jc = new JCommander();
 
@@ -63,16 +75,20 @@ class Main {
 
 
             case "R": // runs the program
-                final Optional<Config> config = configLoader.loadFromFile(CONFIG_PATH);
-                final Main main = new Main(
-                        config.orElseThrow(() -> new IllegalArgumentException("failed to locate config file at: "
-                                + CONFIG_PATH)));
-                main.loop();
+                final Config config = configLoader
+                        .loadFromFile(CONFIG_PATH)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "failed to locate and load config file at: " + CONFIG_PATH));
+
+                final Teflon teflon = new Teflon(config);
+
+                try {
+                    teflon.mainFrame.setVisible(true);
+                    teflon.netSelector.select();
+                } finally {
+                    teflon.mainFrame.dispose();
+                }
                 break;
         }
-    }
-
-    private void loop() {
-        netSelector.loop();
     }
 }

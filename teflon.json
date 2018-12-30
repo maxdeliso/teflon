@@ -3,5 +3,5 @@
   "inputBufferLength": 4096,
   "backlogLength": 1024,
   "multicastGroup": "FF02:0:0:0:0:0:0:77",
-  "interfaceName": "eth6"
+  "interfaceName": "eth2"
 }
