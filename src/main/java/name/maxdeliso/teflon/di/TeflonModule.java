@@ -12,7 +12,10 @@ import name.maxdeliso.teflon.data.JsonMessageMarshaller;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.net.NetSelector;
 import name.maxdeliso.teflon.ui.MainFrame;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import javax.inject.Singleton;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -21,10 +24,10 @@ import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import javax.inject.Singleton;
-
 @Module
 public class TeflonModule {
+    private static final Logger LOG = LoggerFactory.getLogger(TeflonModule.class);
+
     private static final String CONFIG_PATH = "teflon.json";
 
     @Provides
@@ -48,10 +51,12 @@ public class TeflonModule {
     @Provides
     @Singleton
     Config provideConfig(final ConfigLoader configLoader) {
-        return configLoader
-                .loadFromFile(CONFIG_PATH)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "failed to locate and load config file at: " + CONFIG_PATH));
+        return configLoader.loadFromFile(CONFIG_PATH)
+                .orElseThrow(() -> {
+                    final String errorMesage = "failed to locate config file at: " + CONFIG_PATH;
+                    LOG.error(errorMesage);
+                    return new IllegalArgumentException(errorMesage);
+                });
     }
 
     @Provides
@@ -80,6 +85,7 @@ public class TeflonModule {
             // NOTE: this causes a DNS Query to run
             return InetAddress.getByName(config.getMulticastGroup());
         } catch (UnknownHostException uhe) {
+            LOG.error("failed to process multicast group from config", uhe);
             throw new RuntimeException(uhe);
         }
     }
@@ -92,6 +98,7 @@ public class TeflonModule {
             // NOTE: this invokes some platform specific code
             return NetworkInterface.getByName(config.getInterfaceName());
         } catch (SocketException se) {
+            LOG.error("failed to process interface name from config", se);
             throw new RuntimeException(se);
         }
     }

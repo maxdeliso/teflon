@@ -8,7 +8,7 @@ import com.beust.jcommander.Parameter;
 @SuppressWarnings({"unused"})
 class Arguments {
     @Parameter(names = {"--mode", "-m"}, description = "the run mode, one of L[ist interfaces] or R[un]")
-    private String mode;
+    private String mode = "R";
 
     @Parameter(names = {"--help", "-h"}, help = true)
     private boolean help;

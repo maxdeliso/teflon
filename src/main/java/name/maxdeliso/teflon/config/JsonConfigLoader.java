@@ -22,7 +22,7 @@ public class JsonConfigLoader implements ConfigLoader {
         try (final var fileReader = new FileReader(path)) {
             return Optional.ofNullable(gson.fromJson(fileReader, Config.class));
         } catch (final IOException ioe) {
-            LOG.warn("failed to load config", ioe);
+            LOG.error("failed to load config", ioe);
             return Optional.empty();
         }
     }

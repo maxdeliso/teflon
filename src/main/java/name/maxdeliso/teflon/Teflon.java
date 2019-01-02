@@ -26,7 +26,9 @@ class Teflon {
         final Optional<String> modeOpt = ofNullable(arguments.getMode());
 
         if (arguments.isHelp() || modeOpt.isEmpty()) {
-            jc.usage();
+            final StringBuilder sb = new StringBuilder();
+            jc.usage(sb);
+            LOG.error(sb.toString());
             return;
         }
 
