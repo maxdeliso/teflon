@@ -7,7 +7,7 @@ public class RunContext {
     private final AtomicBoolean alive;
     private final String localHostUUID;
 
-    RunContext() {
+    public RunContext() {
         alive = new AtomicBoolean(true);
         localHostUUID = UUID.randomUUID().toString();
     }

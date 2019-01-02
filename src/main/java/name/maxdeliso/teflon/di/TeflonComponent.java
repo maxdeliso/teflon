@@ -1,4 +1,4 @@
-package name.maxdeliso.teflon;
+package name.maxdeliso.teflon.di;
 
 import dagger.Component;
 import name.maxdeliso.teflon.net.NetSelector;
@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 
 @Singleton
 @Component(modules = TeflonModule.class)
+public
 interface TeflonComponent {
     MainFrame mainFrame();
     NetSelector netSelector();

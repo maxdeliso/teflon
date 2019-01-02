@@ -1,6 +1,8 @@
 package name.maxdeliso.teflon;
 
 import com.beust.jcommander.JCommander;
+import name.maxdeliso.teflon.di.DaggerTeflonComponent;
+import name.maxdeliso.teflon.di.TeflonComponent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +44,6 @@ class Teflon {
             case "R": // runs the program
                 final TeflonComponent teflonComponent = DaggerTeflonComponent.builder().build();
                 try {
-
                     teflonComponent.mainFrame().setVisible(true);
                     teflonComponent.netSelector().selectLoop();
                 } finally {

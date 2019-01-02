@@ -1,9 +1,10 @@
-package name.maxdeliso.teflon;
+package name.maxdeliso.teflon.di;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import dagger.Module;
 import dagger.Provides;
+import name.maxdeliso.teflon.RunContext;
 import name.maxdeliso.teflon.config.Config;
 import name.maxdeliso.teflon.config.ConfigLoader;
 import name.maxdeliso.teflon.config.JsonConfigLoader;
