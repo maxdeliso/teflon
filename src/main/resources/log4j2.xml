@@ -17,7 +17,7 @@
         </RollingFile>
     </Appenders>
     <Loggers>
-        <Logger level="TRACE" name="name.maxdeliso.teflon">
+        <Logger level="DEBUG" name="name.maxdeliso.teflon" additivity="false">
             <AppenderRef ref="teflon" />
         </Logger>
         <Root level="INFO">

@@ -1,5 +1,6 @@
 package name.maxdeliso.teflon.ui;
 
+import name.maxdeliso.teflon.RunContext;
 import name.maxdeliso.teflon.data.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +18,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.text.DateFormat;
 import java.util.Date;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.BlockingQueue;
 
 /**
  * A JFrame, which will present a UI through the native windowing system on supported OSes.
@@ -40,16 +40,13 @@ public class MainFrame extends JFrame {
     private final JPanel headerPanel = new JPanel();
     private final JTextField inputTextField = new JTextField();
     private final DateFormat dateFormat = DateFormat.getInstance();
-    private final LinkedBlockingQueue<Message> outgoingMsgQueue;
-    private final AtomicBoolean alive;
-    private final String localHostId;
+    private final BlockingQueue<Message> outgoingMsgQueue;
+    private final RunContext runContext;
 
-    public MainFrame(final LinkedBlockingQueue<Message> outgoingMsgQueue,
-                     final AtomicBoolean alive,
-                     final String localHostId) {
+    public MainFrame(final BlockingQueue<Message> outgoingMsgQueue,
+                     final RunContext runContext) {
         this.outgoingMsgQueue = outgoingMsgQueue;
-        this.alive = alive;
-        this.localHostId = localHostId;
+        this.runContext = runContext;
         buildFrame();
     }
 
@@ -68,12 +65,12 @@ public class MainFrame extends JFrame {
             @Override
             public void keyReleased(final KeyEvent ke) {
                 if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-                    var outgoing = new Message(localHostId, inputTextField.getText());
+                    var outgoing = new Message(runContext.getLocalHostUUID(), inputTextField.getText());
 
                     try {
                         outgoingMsgQueue.put(outgoing);
                     } catch (InterruptedException ie) {
-                        alive.set(false);
+                        runContext.alive().set(false);
                     }
 
                     renderMessage(outgoing, outputTextArea);
@@ -98,7 +95,7 @@ public class MainFrame extends JFrame {
 
             @Override
             public void windowClosed(WindowEvent we) {
-                alive.set(false);
+                runContext.alive().set(false);
             }
         });
 

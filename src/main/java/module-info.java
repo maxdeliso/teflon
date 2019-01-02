@@ -3,4 +3,6 @@ module teflon {
     requires gson;
     requires java.desktop;
     requires jcommander;
+    requires dagger;
+    requires javax.inject;
 }
