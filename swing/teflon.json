@@ -1,7 +1,0 @@
-{
-  "udpPort": 1337,
-  "bufferLength": 4096,
-  "backlogLength": 1024,
-  "hostAddress": "FF02:0:0:0:0:0:0:77",
-  "interfaceName": "eth3"
-}
