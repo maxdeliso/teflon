@@ -4,9 +4,8 @@
 
     <groupId>name.maxdeliso</groupId>
     <artifactId>teflon</artifactId>
-    <version>1.0.6</version>
-    <packaging>pom</packaging>
-
+    <version>1.0.7</version>
+    <packaging>jar</packaging>
     <name>teflon</name>
     <url>https://maxdeliso.name</url>
 
@@ -38,6 +37,15 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
