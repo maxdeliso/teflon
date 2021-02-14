@@ -5,17 +5,15 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.text.DateFormat;
 import java.util.Date;
+import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
-import name.maxdeliso.teflon.ctx.RunContext;
 import name.maxdeliso.teflon.data.Message;
-import name.maxdeliso.teflon.net.NetSelector;
 
 /**
  * A JFrame, which will present a UI through the native windowing system on supported OSes.
@@ -36,13 +34,12 @@ public class MainFrame extends JFrame {
   private final JTextField inputTextField = new JTextField();
   private final DateFormat dateFormat = DateFormat.getInstance();
 
-  private final RunContext runContext;
+  private final UUID uuid;
   private final Consumer<Message> messageConsumer;
-  private Supplier<NetSelector> netSelectorSupplier;
 
-  public MainFrame(final RunContext runContext,
+  public MainFrame(final UUID uuid,
                    final Consumer<Message> messageConsumer) {
-    this.runContext = runContext;
+    this.uuid = uuid;
     this.messageConsumer = messageConsumer;
     buildFrame();
   }
@@ -61,7 +58,7 @@ public class MainFrame extends JFrame {
       @Override
       public void keyReleased(final KeyEvent ke) {
         if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
-          var outgoing = new Message(runContext.getLocalHostUUID(), inputTextField.getText());
+          var outgoing = new Message(uuid.toString(), inputTextField.getText());
           messageConsumer.accept(outgoing);
           inputTextField.setText("");
         }
