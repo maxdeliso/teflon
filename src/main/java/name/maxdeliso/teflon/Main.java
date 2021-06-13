@@ -65,6 +65,7 @@ class Main {
       CompletableFuture
           .supplyAsync(InterfaceChooser::new)
           .thenApply(interfaceChooser -> interfaceChooser.queryInterfaces().stream().findFirst());
+
   private static final CompletableFuture<Void> MAIN =
       BIND_F.thenCompose(inetAddressOpt -> INTERFACE_OPT_F.thenCompose(networkInterfaceOpt -> {
         var inetAddress = inetAddressOpt
@@ -83,7 +84,9 @@ class Main {
       MainFrame mainFrame,
       InetAddress bindAddress,
       NetworkInterface networkInterface) {
-    return CompletableFuture.supplyAsync(() -> new NetSelector(UDP_PORT, BUFFER_LENGTH,
+    return CompletableFuture.supplyAsync(() -> new NetSelector(
+            UDP_PORT,
+            BUFFER_LENGTH,
             (_address, rxBytes) -> MESSAGE_MARSHALLER
                 .bufferToMessage(rxBytes)
                 .ifPresent(mainFrame::queueMessageDisplay),
