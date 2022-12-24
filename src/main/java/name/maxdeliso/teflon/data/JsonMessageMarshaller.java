@@ -21,10 +21,13 @@ public class JsonMessageMarshaller implements MessageMarshaller {
   }
 
   @Override
-  public Optional<Message> bufferToMessage(final byte[] buffer) {
-    try (final ByteArrayInputStream inputStream = new ByteArrayInputStream(buffer);
-         final var isr = new InputStreamReader(inputStream, MESSAGE_CHARSET)) {
-      return Optional.ofNullable(gson.fromJson(isr, Message.class));
+  public Optional<Message> bufferToMessage(final ByteBuffer bb) {
+    var parseBuffer = new byte[bb.limit()];
+    bb.get(parseBuffer);
+
+    try (final var stream = new ByteArrayInputStream(parseBuffer);
+         final var reader = new InputStreamReader(stream, MESSAGE_CHARSET)) {
+      return Optional.ofNullable(gson.fromJson(reader, Message.class));
     } catch (IOException | JsonSyntaxException exc) {
       return Optional.empty();
     }

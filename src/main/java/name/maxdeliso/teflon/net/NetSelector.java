@@ -4,11 +4,13 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.ProtocolFamily;
 import java.net.SocketAddress;
-import java.net.SocketException;
 import java.net.StandardProtocolFamily;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
@@ -19,10 +21,9 @@ import java.nio.channels.Selector;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * This class contains the main event selectLoop which checks in memory queues, and performs UDP
@@ -31,29 +32,30 @@ import java.util.function.Supplier;
 public class NetSelector {
   private static final Logger LOG = LogManager.getLogger(NetSelector.class);
   private final int udpPort;
-  private final ByteBuffer incomingBuffer;
-  private final InetSocketAddress multicastListenSocketAddress;
-  private final BiConsumer<SocketAddress, byte[]> incomingByteBufferConsumer;
-  private final List<InetAddress> candidateBindAddresses;
-  private final NetworkInterface multicastInterface;
+  private final int bufferLength;
+  private final BiConsumer<SocketAddress, ByteBuffer> incomingByteBufferConsumer;
+  private final List<InetAddress> groupAddresses;
+  private final List<NetworkInterface> networkInterfaces;
   private final Supplier<ByteBuffer> outgoingMessageSupplier;
-
-  private final AtomicBoolean alive = new AtomicBoolean(true);
-  private MembershipKey membershipKey;
 
   public NetSelector(final int udpPort,
                      final int bufferLength,
-                     final BiConsumer<SocketAddress, byte[]> incomingByteBufferConsumer,
-                     final List<InetAddress> inetAddresses,
-                     final NetworkInterface multicastInterface,
-                     final Supplier<ByteBuffer> outgoingDataSupplier) {
+                     final List<InetAddress> groupAddresses,
+                     final List<NetworkInterface> networkInterfaces,
+                     final BiConsumer<SocketAddress, ByteBuffer> incomingConsumer,
+                     final Supplier<ByteBuffer> outgoingSupplier) {
     this.udpPort = udpPort;
-    this.incomingByteBufferConsumer = incomingByteBufferConsumer;
-    this.candidateBindAddresses = inetAddresses;
-    this.multicastInterface = multicastInterface;
-    this.incomingBuffer = ByteBuffer.allocate(bufferLength);
-    this.multicastListenSocketAddress = new InetSocketAddress(udpPort); // note: wildcard address
-    this.outgoingMessageSupplier = outgoingDataSupplier;
+    this.bufferLength = bufferLength;
+    this.groupAddresses = groupAddresses;
+    this.networkInterfaces = networkInterfaces;
+    this.incomingByteBufferConsumer = incomingConsumer;
+    this.outgoingMessageSupplier = outgoingSupplier;
+
+    for(var address : groupAddresses) {
+      if (!address.isMulticastAddress()) {
+        throw new IllegalArgumentException(address + " must be a multicast address");
+      }
+    }
   }
 
   /**
@@ -61,48 +63,57 @@ public class NetSelector {
    * continual sending and receiving as data arrives.
    */
   public CompletableFuture<Void> selectLoop() {
-    return setupMulticastDatagramAsync(candidateBindAddresses)
-        .thenApply(datagramChannel -> {
-          try (final Selector datagramChanSelector = Selector.open()) {
-            datagramChannel.register(datagramChanSelector,
-                SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+    var dataBuffer = ByteBuffer.allocateDirect(bufferLength);
 
-            while (alive.get() && membershipKey.isValid()) {
-              datagramChanSelector.select(0);
-              final var selectionKeySet = datagramChanSelector.selectedKeys();
+    if (networkInterfaces.size() > 1) {
+      LOG.warn("multiple viable network interfaces located (will use the first one): {}",
+          networkInterfaces.stream().map(NetworkInterface::getName).collect(Collectors.joining(", ")));
+    }
 
-              for (final SelectionKey key : selectionKeySet) {
-                if (key.isReadable()) {
-                  incomingBuffer.clear();
-                  var sender = datagramChannel.receive(incomingBuffer);
-                  var receivedBytes = new byte[incomingBuffer.position()];
-                  incomingBuffer.rewind();
-                  incomingBuffer.get(receivedBytes);
+    return CompletableFuture
+        .supplyAsync(() -> networkInterfaces
+            .stream()
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("no viable network interfaces found")))
+        .thenCompose(ni -> joinFirstGroup(ni, udpPort, groupAddresses, (dc, membershipKey) -> {
+              var sendSockAddress = new InetSocketAddress(membershipKey.group(), udpPort);
 
-                  // NOTE: heavy compute in incoming consumer will add latency
-                  incomingByteBufferConsumer.accept(sender, receivedBytes);
+              LOG.info("entering main select loop with interface {} and multicast send address {}",
+                  ni.getName(), sendSockAddress);
+
+              try (final var selector = Selector.open()) {
+                dc.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+
+                while (membershipKey.isValid()) {
+                  selector.select(0);
+
+                  for (final var key : selector.selectedKeys()) {
+                    if (key.isReadable()) {
+                      var sender = dc.receive(dataBuffer);
+                      dataBuffer.flip();
+                      incomingByteBufferConsumer.accept(sender, dataBuffer.asReadOnlyBuffer());
+                      dataBuffer.clear();
+                    }
+
+                    if (key.isWritable()) {
+                      Optional
+                          .ofNullable(outgoingMessageSupplier.get())
+                          .filter(bb -> bb.array().length > 0)
+                          .ifPresent(bb -> multicastSend(dc, bb, sendSockAddress));
+                    }
+                  }
                 }
-
-                if (key.isWritable()) {
-                  Optional.ofNullable(outgoingMessageSupplier.get())
-                      .filter(byteBuffer -> byteBuffer.array().length > 0)
-                      .ifPresent(bb -> runMulticastSend(bb, datagramChannel, membershipKey));
-                }
+              } catch (IOException ioe) {
+                throw new RuntimeException("I/O exception in main event loop", ioe);
               }
             }
-          } catch (IOException exc) {
-            LOG.error("unexpected exception in main event selectLoop", exc);
-          }
-
-          return null;
-        });
+        ));
   }
 
-  private void runMulticastSend(ByteBuffer bb, DatagramChannel dc, MembershipKey mk) {
+  private void multicastSend(DatagramChannel dc, ByteBuffer bb, InetSocketAddress isa) {
     try {
-      final var sendAddress = new InetSocketAddress(mk.group(), udpPort);
       final var bufferLength = bb.array().length;
-      final var sentBytes = dc.send(bb, sendAddress);
+      final var sentBytes = dc.send(bb, isa);
 
       if (bufferLength != sentBytes) {
         LOG.warn("only successfully sent {} of {} bytes", sentBytes, bufferLength);
@@ -114,75 +125,42 @@ public class NetSelector {
     }
   }
 
+  private CompletableFuture<Void> joinFirstGroup(
+      NetworkInterface networkInterface,
+      int udpPort,
+      List<InetAddress> groupAddressCandidates,
+      BiConsumer<DatagramChannel, MembershipKey> channelMemberConsumer
+  ) {
+    return CompletableFuture.supplyAsync(
+        () -> {
+          for (InetAddress address : groupAddressCandidates) {
+            try (final var dc = DatagramChannel.open(reflectProtocolFamily(address))) {
+              dc.setOption(StandardSocketOptions.IP_MULTICAST_IF, networkInterface);
+              dc.setOption(StandardSocketOptions.SO_REUSEADDR, true);
+              dc.configureBlocking(false);
+              dc.bind(new InetSocketAddress(udpPort)); // note: wildcard address
+              var membershipKey = dc.join(address, networkInterface);
+              channelMemberConsumer.accept(dc, membershipKey);
+              return null;
+            } catch (IOException ioe) {
+              LOG.warn("failed to join group at address {}", address, ioe);
+              // will continue to the next candidate address
+            }
+          }
 
-  private CompletableFuture<DatagramChannel> setupMulticastDatagramAsync(InetAddress bindAddress) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        final StandardProtocolFamily spf;
-
-        if (bindAddress instanceof java.net.Inet4Address) {
-          spf = java.net.StandardProtocolFamily.INET;
-        } else if (bindAddress instanceof java.net.Inet6Address) {
-          spf = java.net.StandardProtocolFamily.INET6;
-        } else {
-          throw new RuntimeException("unrecognized inet address type");
+          throw new RuntimeException("failed to set up any multicast channels");
         }
-
-        final DatagramChannel channel = DatagramChannel.open(spf);
-
-        CompletableFuture.runAsync(() -> {
-          try {
-            channel.setOption(StandardSocketOptions.IP_MULTICAST_IF, multicastInterface);
-          } catch (IOException ioe) {
-            throw new IllegalStateException("failed to set IP_MULTICAST_IF socket option", ioe);
-          }
-        }).thenRun(() -> {
-          try {
-            channel.configureBlocking(false);
-          } catch (IOException ioe) {
-            throw new IllegalStateException("failed to configure a non-blocking channel", ioe);
-          }
-        }).get();
-
-        this.membershipKey = channel.join(bindAddress, multicastInterface);
-        LOG.debug("joined to group {}", this.membershipKey.group());
-        return channel;
-      } catch (IOException | InterruptedException | ExecutionException eiieee) {
-        LOG.error("failed to setup a datagram channel", eiieee);
-        throw new RuntimeException("failed to setup a datagram channel", eiieee);
-      }
-    });
-
+    );
   }
 
-  private CompletableFuture<DatagramChannel> setupMulticastDatagramAsync(List<InetAddress> bindAddresses) {
-    var bindFs = bindAddresses
-        .stream()
-        .map(this::setupMulticastDatagramAsync)
-        .toList();
-
-    return CompletableFuture.allOf(bindFs.toArray(new CompletableFuture[0])).thenApply(ignored ->
-        {
-          var firstSetupF = bindFs
-              .stream()
-              .filter(datagramSetupF -> datagramSetupF.isDone() && !datagramSetupF.isCancelled())
-              .findFirst()
-              .orElseThrow();
-
-          return firstSetupF.join();
-        })
-        .thenApply(datagramChannel -> {
-          CompletableFuture
-              .runAsync(() -> {
-                try {
-                  datagramChannel.socket().bind(multicastListenSocketAddress);
-                } catch (SocketException se) {
-                  throw new RuntimeException("failed to bind datagram channel to :"
-                      + multicastListenSocketAddress);
-                }
-              }).join();
-
-          return datagramChannel;
-        });
+  private ProtocolFamily reflectProtocolFamily(InetAddress inetAddress) {
+    if (inetAddress instanceof Inet4Address) {
+      return StandardProtocolFamily.INET;
+    } else if (inetAddress instanceof Inet6Address) {
+      return StandardProtocolFamily.INET6;
+    } else {
+      LOG.error("invalid candidate address with unrecognized type: {}", inetAddress);
+      throw new RuntimeException("invalid address type: " + inetAddress.getClass());
+    }
   }
 }

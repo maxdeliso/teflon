@@ -14,7 +14,6 @@ import org.apache.logging.log4j.Logger;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -68,51 +67,37 @@ class Main {
             }
           }
 
+          if (results.isEmpty()) {
+            throw new RuntimeException("failed to lookup any of the supplied addresses: " +
+                String.join(", ", addressLiterals));
+          }
+
           return results;
         });
-  }
-
-  private static final CompletableFuture<Optional<NetworkInterface>> INTERFACE_OPT_F =
-      CompletableFuture
-          .supplyAsync(InterfaceChooser::new)
-          .thenApply(interfaceChooser -> interfaceChooser.queryInterfaces().stream().findFirst());
-
-  private static final CompletableFuture<Void> MAIN =
-      lookupAddressesAsync(MULTICAST_IPV6_BIND_ADDRESS, MULTICAST_IPV4_BIND_ADDRESS).thenCompose(
-          inetAddresses ->
-              INTERFACE_OPT_F.thenCompose(networkInterfaceOpt ->
-              {
-                var networkInterface = networkInterfaceOpt
-                    .orElseThrow(() -> new IllegalStateException("failed to locate viable network interface"));
-
-                return MAIN_FRAME_F
-                    .thenCompose(mainFrame -> networkLoop(mainFrame, inetAddresses, networkInterface));
-              }));
-
-  private static CompletableFuture<Void> networkLoop(
-      MainFrame mainFrame,
-      List<InetAddress> bindAddresses,
-      NetworkInterface networkInterface) {
-    return CompletableFuture.supplyAsync(() -> new NetSelector(
-            UDP_PORT,
-            BUFFER_LENGTH,
-            (_address, rxBytes) -> MESSAGE_MARSHALLER
-                .bufferToMessage(rxBytes)
-                .ifPresent(mainFrame::queueMessageDisplay),
-            bindAddresses,
-            networkInterface,
-            () -> Optional
-                .ofNullable(TRANSFER_QUEUE.poll())
-                .map(MESSAGE_MARSHALLER::messageToBuffer)
-                .orElse(null)
-        )
-    ).thenCompose(NetSelector::selectLoop);
   }
 
   public static void main(String[] args) {
     try {
       LOG.info("starting up with UUID {}", UUID);
-      MAIN.get();
+
+      lookupAddressesAsync(MULTICAST_IPV6_BIND_ADDRESS, MULTICAST_IPV4_BIND_ADDRESS)
+          .thenCompose(addresses -> MAIN_FRAME_F
+              .thenCompose(mainFrame ->
+                  CompletableFuture.supplyAsync(() -> new NetSelector(
+                          UDP_PORT,
+                          BUFFER_LENGTH,
+                          addresses,
+                          new InterfaceChooser().queryInterfaces(),
+                          (_address, bb) -> MESSAGE_MARSHALLER
+                              .bufferToMessage(bb)
+                              .ifPresent(mainFrame::queueMessageDisplay),
+                          () -> Optional
+                              .ofNullable(TRANSFER_QUEUE.poll())
+                              .map(MESSAGE_MARSHALLER::messageToBuffer)
+                              .orElse(null)
+                      )
+                  ).thenCompose(NetSelector::selectLoop)))
+          .get();
     } catch (InterruptedException ie) {
       LOG.error("synchronization error", ie);
       System.exit(1);
