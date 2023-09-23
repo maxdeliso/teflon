@@ -79,7 +79,7 @@ public class NetSelector {
               var sendSockAddress = new InetSocketAddress(membershipKey.group(), udpPort);
 
               LOG.info("entering main select loop with interface {} and multicast send address {}",
-                  ni.getName(), sendSockAddress);
+                  ni.getDisplayName(), sendSockAddress);
 
               try (final var selector = Selector.open()) {
                 dc.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);

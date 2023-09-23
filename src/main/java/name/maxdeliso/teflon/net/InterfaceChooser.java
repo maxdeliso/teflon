@@ -21,11 +21,18 @@ public class InterfaceChooser {
         .stream()
         .filter(ni -> {
           try {
+            var hwAddr = ni.getHardwareAddress();
+            var ifaceAddrs = ni.getInterfaceAddresses();
+            var inetAddrs = ni.getInetAddresses();
+
             return ni.isUp() &&
                 ni.supportsMulticast() &&
                 !ni.isLoopback() &&
                 !ni.isPointToPoint() &&
-                !ni.isVirtual();
+                !ni.isVirtual() &&
+                hwAddr != null &&
+                !ifaceAddrs.isEmpty() &&
+                inetAddrs.hasMoreElements();
           } catch (SocketException exc) {
             return false;
           }
