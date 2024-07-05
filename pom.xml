@@ -4,16 +4,17 @@
 
     <groupId>name.maxdeliso</groupId>
     <artifactId>teflon</artifactId>
-    <version>1.0.12</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
     <name>teflon</name>
-    <url>https://maxdeliso.name</url>
+    <url>https://github.com/maxdeliso/teflon</url>
 
     <properties>
         <java.version>21</java.version>
+        <java.target>21</java.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>${java.version}</maven.compiler.source>
-        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.target>${java.target}</maven.compiler.target>
     </properties>
 
     <dependencies>
@@ -43,7 +44,7 @@
                 <version>3.11.0</version>
                 <configuration>
                     <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <target>${java.target}</target>
                 </configuration>
             </plugin>
             <plugin>
@@ -55,26 +56,33 @@
                         <goals>
                             <goal>single</goal>
                         </goals>
+                        <configuration>
+                            <archive>
+                                <manifest>
+                                    <mainClass>name.maxdeliso.teflon.Main</mainClass>
+                                    <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                                </manifest>
+                                <manifestEntries>
+                                    <Implementation-Version>${project.version}</Implementation-Version>
+                                </manifestEntries>
+                            </archive>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>name.maxdeliso.teflon.Main</mainClass>
-                        </manifest>
-                    </archive>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.3.0</version>
                 <configuration>
-                    <outputDirectory>
-                        ${project.build.directory}/modules
-                    </outputDirectory>
+                    <outputDirectory>${project.build.directory}/modules</outputDirectory>
+                    <archive>
+                        <manifestEntries>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
             </plugin>
             <plugin>
@@ -88,9 +96,7 @@
                             <goal>copy-dependencies</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>
-                                ${project.build.directory}/modules
-                            </outputDirectory>
+                            <outputDirectory>${project.build.directory}/modules</outputDirectory>
                             <includeScope>runtime</includeScope>
                         </configuration>
                     </execution>

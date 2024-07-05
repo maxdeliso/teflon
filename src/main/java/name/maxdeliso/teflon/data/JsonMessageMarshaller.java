@@ -2,6 +2,7 @@ package name.maxdeliso.teflon.data;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
