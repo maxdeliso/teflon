@@ -1,4 +1,3 @@
-
 package name.maxdeliso.teflon.net;
 
 import org.apache.logging.log4j.LogManager;
