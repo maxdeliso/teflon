@@ -6,7 +6,6 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
@@ -14,8 +13,9 @@ import java.util.function.Supplier;
 public class NetSelector {
     private final int bufferLength;
     private final ConnectionResult connectionResult;
-    private final BiConsumer<SocketAddress, ByteBuffer> incomingByteBufferConsumer;
+    private final BiConsumer<SocketAddress, ByteBuffer> onIncomingMessage;
     private final Supplier<ByteBuffer> outgoingMessageSupplier;
+    private final CompletableFuture<Void> loopFuture = new CompletableFuture<>();
 
     public NetSelector(final int bufferLength,
                        final ConnectionResult connectionResult,
@@ -23,7 +23,7 @@ public class NetSelector {
                        final Supplier<ByteBuffer> outgoingSupplier) {
         this.bufferLength = bufferLength;
         this.connectionResult = connectionResult;
-        this.incomingByteBufferConsumer = incomingConsumer;
+        this.onIncomingMessage = incomingConsumer;
         this.outgoingMessageSupplier = outgoingSupplier;
     }
 
@@ -32,33 +32,50 @@ public class NetSelector {
         var sendSockAddress = new InetSocketAddress(
                 this.connectionResult.getMembershipKey().group(),
                 this.connectionResult.getPort());
-        var multicastSender = new MulticastSender(
-                connectionResult.getDc(),
-                sendSockAddress);
+        var multicastSender = new MulticastSender(connectionResult.getDc(), sendSockAddress);
 
         try (final var selector = Selector.open()) {
             connectionResult.getDc().register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
-            while (this.connectionResult.getMembershipKey().isValid()) {
-                selector.select(0);
+            while (this.connectionResult.getMembershipKey().isValid() && !Thread.interrupted()) {
+                selector.select();
+                var selectedKeys = selector.selectedKeys();
+                var iterator = selectedKeys.iterator();
 
-                for (final var key : selector.selectedKeys()) {
+                while (iterator.hasNext()) {
+                    SelectionKey key = iterator.next();
+                    iterator.remove();
+
+                    if (!key.isValid()) {
+                        continue;
+                    }
+
                     if (key.isReadable()) {
-                        var sender = connectionResult.getDc().receive(dataBuffer);
-                        dataBuffer.flip();
-                        incomingByteBufferConsumer.accept(sender, dataBuffer.asReadOnlyBuffer());
-                        dataBuffer.clear();
+                        SocketAddress sender = connectionResult.getDc().receive(dataBuffer);
+                        if (sender != null) {
+                            dataBuffer.flip();
+                            onIncomingMessage.accept(sender, dataBuffer.asReadOnlyBuffer());
+                            dataBuffer.clear();
+                        }
                     }
 
                     if (key.isWritable()) {
-                        Optional.ofNullable(outgoingMessageSupplier.get())
-                                .filter(bb -> bb.array().length > 0)
-                                .ifPresent(multicastSender::send);
+                        var outgoing = outgoingMessageSupplier.get();
+                        if (outgoing != null && outgoing.hasRemaining()) {
+                            multicastSender.send(outgoing);
+                        }
                     }
                 }
             }
+        } catch (IOException ioe) {
+            loopFuture.completeExceptionally(ioe);
+            throw ioe;
+        } finally {
+            if (!loopFuture.isDone()) {
+                loopFuture.complete(null);
+            }
         }
 
-        return null;
+        return loopFuture;
     }
 }

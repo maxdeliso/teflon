@@ -3,9 +3,13 @@ package name.maxdeliso.teflon.ui;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import javax.swing.*;
+import javax.swing.JDialog;
+import javax.swing.JEditorPane;
+import javax.swing.JFrame;
+import javax.swing.JPanel;
 import javax.swing.event.HyperlinkEvent;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Desktop;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;

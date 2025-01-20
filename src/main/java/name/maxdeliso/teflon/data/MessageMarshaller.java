@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 
 public interface MessageMarshaller {
-  Optional<Message> bufferToMessage(final ByteBuffer bb);
+    Optional<Message> bufferToMessage(final ByteBuffer bb);
 
-  ByteBuffer messageToBuffer(final Message message);
+    ByteBuffer messageToBuffer(final Message message);
 }

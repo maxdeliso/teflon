@@ -7,6 +7,15 @@ import java.util.Objects;
 public class ConnectionResult {
     private final int port;
     private final DatagramChannel dc;
+    private final MembershipKey membershipKey;
+
+    public ConnectionResult(int port,
+                            DatagramChannel dc,
+                            MembershipKey mk) {
+        this.port = port;
+        this.dc = dc;
+        this.membershipKey = mk;
+    }
 
     public DatagramChannel getDc() {
         return dc;
@@ -20,22 +29,20 @@ public class ConnectionResult {
         return membershipKey;
     }
 
-    private final MembershipKey membershipKey;
-
-    public ConnectionResult(int port,
-                            DatagramChannel dc,
-                            MembershipKey mk) {
-        this.port = port;
-        this.dc = dc;
-        this.membershipKey = mk;
-    }
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ConnectionResult that = (ConnectionResult) o;
-        return port == that.port && Objects.equals(dc, that.dc) && Objects.equals(membershipKey, that.membershipKey);
+        boolean result;
+        if (this == o) {
+            result = true;
+        } else if (o == null || getClass() != o.getClass()) {
+            result = false;
+        } else {
+            var that = (ConnectionResult) o;
+            result = (port == that.port) &&
+                    java.util.Objects.equals(dc, that.dc) &&
+                    java.util.Objects.equals(membershipKey, that.membershipKey);
+        }
+        return result;
     }
 
     @Override

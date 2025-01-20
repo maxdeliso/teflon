@@ -1,35 +1,28 @@
 package name.maxdeliso.teflon.data;
 
-/**
- * A simple message class with a sender id and a string body.
- */
-public final class Message {
-  private static final String MESSAGE_SEPARATOR = " >> ";
+import java.util.UUID;
 
-  private final String senderId;
-  private final String body;
+import static org.apache.commons.text.StringEscapeUtils.escapeHtml4;
 
-  public Message() {
-    this.senderId = "";
-    this.body = "";
-    // NOTE: for Gson
-  }
+public record Message(String senderId, String body) {
+    public boolean isValidSenderId() {
+        try {
+            UUID.fromString(senderId);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
 
-  public Message(String senderId, String body) {
-    this.senderId = senderId;
-    this.body = body;
-  }
+    public String generateColor() {
+        if (!isValidSenderId()) {
+            throw new IllegalArgumentException("Invalid UUID format for senderId: " + senderId);
+        }
+        int colorInt = senderId.hashCode() & 0xFFFFFF;
+        return String.format("#%06X", colorInt);
+    }
 
-  public String senderId() {
-    return this.senderId;
-  }
-
-  private String body() {
-    return this.body;
-  }
-
-  @Override
-  public String toString() {
-    return String.join(MESSAGE_SEPARATOR, senderId(), body());
-  }
+    public String htmlSafeBody() {
+        return escapeHtml4(body);
+    }
 }

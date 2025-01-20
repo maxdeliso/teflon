@@ -20,7 +20,7 @@ public class MulticastSender {
 
     public void send(ByteBuffer bb) {
         try {
-            final var bufferLength = bb.array().length;
+            final var bufferLength = bb.remaining();
             final var sentBytes = dc.send(bb, isa);
 
             if (bufferLength != sentBytes) {

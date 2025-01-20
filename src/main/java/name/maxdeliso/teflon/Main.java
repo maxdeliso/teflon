@@ -11,44 +11,61 @@ import name.maxdeliso.teflon.ui.MainFrame;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import javax.swing.SwingUtilities;
 import java.util.UUID;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedTransferQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TransferQueue;
 
 import static java.util.UUID.randomUUID;
 
 public class Main {
-  private static final Logger LOG = LogManager.getLogger(Main.class);
-  private static final Gson GSON = new GsonBuilder().create();
+    public static final String MULTICAST_IPV6_BIND_ADDRESS = "FF02::77";
+    public static final String MULTICAST_IPV4_BIND_ADDRESS = "224.0.0.122";
+    public static final int DEFAULT_UDP_PORT = 1337;
+    public static final int BUFFER_LENGTH = 4096;
+    public static final TransferQueue<Message> TRANSFER_QUEUE = new LinkedTransferQueue<>();
+    private static final Logger LOG = LogManager.getLogger(Main.class);
+    private static final Gson GSON = new GsonBuilder().create();
+    public static final MessageMarshaller MESSAGE_MARSHALLER = new JsonMessageMarshaller(GSON);
+    private static final UUID INSTANCE_ID = randomUUID();
+    private static final NetworkInterfaceManager INTERFACE_MANAGER = new NetworkInterfaceManager();
+    private static final ConnectionManager CONNECTION_MANAGER = new ConnectionManager();
 
-  public static final String MULTICAST_IPV6_BIND_ADDRESS = "FF02::77";
-  public static final String MULTICAST_IPV4_BIND_ADDRESS = "224.0.0.122";
-  public static final int DEFAULT_UDP_PORT = 1337;
-  public static final int BUFFER_LENGTH = 4096;
-  private static final UUID UUID = randomUUID();
+    public static void main(String[] args) {
+        var netExecutor = Executors.newSingleThreadExecutor();
+        SwingUtilities.invokeLater(() -> {
+            var mainFrame = new MainFrame(
+                    INSTANCE_ID,
+                    TRANSFER_QUEUE::add,
+                    netExecutor,
+                    CONNECTION_MANAGER,
+                    INTERFACE_MANAGER
+            );
+            mainFrame.setVisible(true);
+        });
 
-  public static final MessageMarshaller MESSAGE_MARSHALLER = new JsonMessageMarshaller(GSON);
-  public static final TransferQueue<Message> TRANSFER_QUEUE = new LinkedTransferQueue<>();
-  private static final NetworkInterfaceManager nim = new NetworkInterfaceManager();
-  private static final ConnectionManager cm = new ConnectionManager();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            shutdownExecutor(netExecutor);
+        }));
+    }
 
-  public static void main(String[] args) {
-    final ExecutorService netExecutor = Executors.newSingleThreadExecutor();
-    var mainFrame = new MainFrame(UUID, TRANSFER_QUEUE::add, netExecutor, cm, nim);
-    mainFrame.setVisible(true);
-    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-      try {
-        netExecutor.shutdown();
-        LOG.info("net executor shutdown initiated...");
-        if (!netExecutor.awaitTermination(1, TimeUnit.SECONDS)) {
-          netExecutor.shutdownNow();
+    private static void shutdownExecutor(ExecutorService executorService) {
+        try {
+            executorService.shutdown();
+            LOG.info("Shutting down netExecutor...");
+            if (!executorService.awaitTermination(2, TimeUnit.SECONDS)) {
+                LOG.warn("Forcing netExecutor shutdownNow() after timeout.");
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            LOG.warn("Shutdown interrupted, forcing netExecutor shutdown.");
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt(); // Restore interrupt status
+        } finally {
+            LOG.info("netExecutor shutdown complete.");
         }
-      } catch (InterruptedException e) {
-        netExecutor.shutdownNow();
-      } finally {
-        LOG.info("net executor shutdown complete");
-      }
-    }));
-
-    LOG.info("main thread joining");
-  }
+    }
 }

@@ -8,8 +8,18 @@ import name.maxdeliso.teflon.net.NetworkInterfaceManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.ImageIcon;
+import javax.swing.JEditorPane;
+import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import java.awt.BorderLayout;
+import java.awt.Image;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
@@ -21,79 +31,105 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-import static name.maxdeliso.teflon.Main.*;
+import static name.maxdeliso.teflon.Main.BUFFER_LENGTH;
+import static name.maxdeliso.teflon.Main.MESSAGE_MARSHALLER;
+import static name.maxdeliso.teflon.Main.TRANSFER_QUEUE;
 
 public class MainFrame extends JFrame {
+    private static final Logger LOG = LogManager.getLogger(MainFrame.class);
+
     private static final int FRAME_WIDTH = 512;
     private static final int FRAME_HEIGHT = 316;
     private static final String FRAME_TITLE = "Teflon";
-    private static final Logger LOG = LogManager.getLogger(MainFrame.class);
 
+    // Menu items
     private final JMenuItem connectMenuItem = new JMenuItem("Connect");
     private final JMenuItem disconnectMenuItem = new JMenuItem("Disconnect");
     private final JMenuItem aboutMenuItem = new JMenuItem("About");
 
-    private final JTextArea outputTextArea = createOutputTextArea();
+    // Status bar (top)
     private final JTextField statusTextField = createStatusTextField();
-    private final JTextField inputTextField = createInputTextField();
-    private final DateFormat dateFormat = DateFormat.getInstance();
+    // Networking and domain objects
     private final ExecutorService netExecutor;
-
     private final UUID uuid;
     private final Consumer<Message> messageConsumer;
+    // Input field (bottom)
+    private final JTextField inputTextField = createInputTextField();
     private final ConnectionManager cm;
     private final NetworkInterfaceManager nim;
-
+    // A JEditorPane for HTML content
+    private final JEditorPane messagePane = createMessagePane();
+    // We'll accumulate the conversation in a StringBuilder
+    private final StringBuilder htmlBuffer = new StringBuilder("<html><body>");
+    // Simple date formatter for incoming messages
+    private final DateFormat dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
+    // Connection dialog
     private ConnectionDialog connectionDialog = null;
+    // Holds the current connection info (if any)
     private ConnectionResult connectionResult = null;
 
     public MainFrame(final UUID uuid,
                      final Consumer<Message> messageConsumer,
                      ExecutorService netExecutor,
-                     ConnectionManager cm,
-                     NetworkInterfaceManager nim) {
+                     ConnectionManager connectionManager,
+                     NetworkInterfaceManager networkInterfaceManager) {
         this.uuid = uuid;
         this.messageConsumer = messageConsumer;
         this.netExecutor = netExecutor;
-        this.cm = cm;
-        this.nim = nim;
+        this.cm = connectionManager;
+        this.nim = networkInterfaceManager;
 
-        setSize(FRAME_WIDTH, FRAME_HEIGHT);
+        // Set a custom icon from the classpath
+        var iconResource = getClass().getResource("/images/icon.jpg");
+        if (iconResource != null) {
+            Image iconImage = new ImageIcon(iconResource).getImage();
+            setIconImage(iconImage);
+        }
+
+        // Basic frame settings
         setTitle(FRAME_TITLE);
+        setSize(FRAME_WIDTH, FRAME_HEIGHT);
         setLayout(new BorderLayout());
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
+        // Add top status text
+        add(statusTextField, BorderLayout.PAGE_START);
+
+        // Add our message pane in the center
+        // A scroll pane containing the messagePane
+        javax.swing.JScrollPane messageScrollPane = new javax.swing.JScrollPane(messagePane);
+        add(messageScrollPane, BorderLayout.CENTER);
+
+        // Add input field at bottom
+        add(new JScrollPane(inputTextField), BorderLayout.PAGE_END);
+
+        // Set up the menu bar
         setJMenuBar(setupMenuBar());
 
-        add(BorderLayout.PAGE_START, statusTextField);
-        add(BorderLayout.CENTER, new JScrollPane(outputTextArea));
-        add(BorderLayout.PAGE_END, new JScrollPane(inputTextField));
-
+        // Start in disconnected state
         updateConnectivityState(false);
     }
 
-    private JTextArea createOutputTextArea() {
-        JTextArea textArea = new JTextArea();
-        textArea.setLineWrap(true);
-        textArea.setEditable(false);
-        return textArea;
-    }
-
+    /**
+     * Creates a non-editable text field to show connection status.
+     */
     private JTextField createStatusTextField() {
-        JTextField textField = new JTextField();
+        JTextField textField = new JTextField("disconnected");
         textField.setEditable(false);
         textField.setHorizontalAlignment(SwingConstants.CENTER);
-        textField.setText("disconnected");
         return textField;
     }
 
+    /**
+     * Creates the input field that sends a Message when user presses Enter.
+     */
     private JTextField createInputTextField() {
         JTextField textField = new JTextField();
         textField.setEditable(false);
         textField.addKeyListener(new KeyAdapter() {
             @Override
-            public void keyReleased(final KeyEvent ke) {
-                if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
+            public void keyReleased(final KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     var outgoing = new Message(uuid.toString(), textField.getText());
                     messageConsumer.accept(outgoing);
                     textField.setText("");
@@ -103,34 +139,60 @@ public class MainFrame extends JFrame {
         return textField;
     }
 
+    /**
+     * Creates a JEditorPane that uses HTML content.
+     */
+    private JEditorPane createMessagePane() {
+        JEditorPane editor = new JEditorPane();
+        editor.setContentType("text/html");
+        editor.setEditable(false);
+        editor.setText("<html><body></body></html>");
+        return editor;
+    }
+
+    /**
+     * Sets up the menu bar with Connect, Disconnect, and About items.
+     */
     private JMenuBar setupMenuBar() {
         var mb = new JMenuBar();
         var menu = new JMenu("Main");
+
         connectMenuItem.addActionListener(ev -> showConnectionModal());
         menu.add(connectMenuItem);
+
         disconnectMenuItem.addActionListener(ev -> disconnect());
         menu.add(disconnectMenuItem);
+
         aboutMenuItem.addActionListener(ev -> showAboutDialog());
         menu.add(aboutMenuItem);
+
         mb.add(menu);
         return mb;
     }
 
+    /**
+     * Shows the ConnectionDialog for selecting interface, IP, and port.
+     */
     private void showConnectionModal() {
         if (connectionDialog == null) {
             connectionDialog = new ConnectionDialog(
                     this,
                     nim.queryInterfaces(),
                     this::handleConnectionResult,
-                    cm);
+                    cm
+            );
         }
         connectionDialog.setVisible(true);
     }
 
+    /**
+     * Called after the user successfully connects in the ConnectionDialog.
+     */
     private void handleConnectionResult(ConnectionResult connectionResult) {
         this.connectionResult = connectionResult;
         updateConnectivityState(true);
         updateStatusText("connected: " + connectionResult);
+
         SwingUtilities.invokeLater(() -> connectionDialog.setVisible(false));
 
         CompletableFuture
@@ -146,13 +208,18 @@ public class MainFrame extends JFrame {
                 .exceptionally(this::handleError);
     }
 
+    /**
+     * Builds a NetSelector for reading/writing messages from the multicast.
+     */
     private NetSelector createNetSelector(ConnectionResult connectionResult) {
         return new NetSelector(
                 BUFFER_LENGTH,
                 connectionResult,
+                // Incoming message handler
                 (_address, bb) -> MESSAGE_MARSHALLER
                         .bufferToMessage(bb)
                         .ifPresent(msg -> SwingUtilities.invokeLater(() -> renderMessage(msg))),
+                // Outgoing message supplier
                 () -> Optional
                         .ofNullable(TRANSFER_QUEUE.poll())
                         .map(MESSAGE_MARSHALLER::messageToBuffer)
@@ -160,21 +227,26 @@ public class MainFrame extends JFrame {
         );
     }
 
-    private void handleDisconnect() {
-        updateConnectivityState(false);
-        updateStatusText("disconnected");
-    }
-
-    private Void handleError(Throwable ex) {
-        LOG.error("exception in net loop", ex);
-        updateConnectivityState(false);
-        updateStatusText("error: " + ex.getMessage());
-        return null;
-    }
-
     private void renderMessage(final Message msg) {
-        final var timeString = dateFormat.format(new Date());
-        outputTextArea.append(timeString + " : " + msg.toString() + "\n");
+        var timeString = dateFormat.format(new Date());
+
+        var newMessageHtml =
+                "<p style=\"margin:0; padding:0;\">"
+                        + "  <span style=\"color:" + msg.generateColor() + "; font-weight:bold;\""
+                        + "        title=\"" + msg.senderId() + "\">"
+                        + msg.senderId().substring(0, 8)
+                        + "  </span>"
+                        + "  <span style=\"color:gray; font-size:small;\">&nbsp;[" + timeString + "]</span>"
+                        + "  <br/>"
+                        + msg.htmlSafeBody()
+                        + "</p>";
+
+        htmlBuffer.append(newMessageHtml);
+        messagePane.setText(htmlBuffer + "</body></html>");
+
+        SwingUtilities.invokeLater(() -> {
+            messagePane.setCaretPosition(messagePane.getDocument().getLength());
+        });
     }
 
     private void disconnect() {
@@ -190,6 +262,18 @@ public class MainFrame extends JFrame {
                 connectionResult = null;
             }
         }
+    }
+
+    private void handleDisconnect() {
+        updateConnectivityState(false);
+        updateStatusText("disconnected");
+    }
+
+    private Void handleError(Throwable ex) {
+        LOG.error("exception in net loop", ex);
+        updateConnectivityState(false);
+        updateStatusText("error: " + ex.getMessage());
+        return null;
     }
 
     private void updateConnectivityState(boolean isConnected) {
