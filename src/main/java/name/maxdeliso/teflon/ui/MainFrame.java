@@ -1,210 +1,343 @@
 package name.maxdeliso.teflon.ui;
 
-import name.maxdeliso.teflon.data.Message;
-import name.maxdeliso.teflon.net.ConnectionManager;
-import name.maxdeliso.teflon.net.ConnectionResult;
-import name.maxdeliso.teflon.net.NetSelector;
-import name.maxdeliso.teflon.net.NetworkInterfaceManager;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
-import javax.swing.ImageIcon;
-import javax.swing.JEditorPane;
-import javax.swing.JFrame;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.JScrollPane;
-import javax.swing.JTextField;
-import javax.swing.SwingConstants;
-import javax.swing.SwingUtilities;
 import java.awt.BorderLayout;
-import java.awt.Image;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
 import java.io.IOException;
-import java.text.DateFormat;
+import java.net.NetworkInterface;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.Optional;
+import java.util.List;
+import static java.util.Optional.ofNullable;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-import static name.maxdeliso.teflon.Main.BUFFER_LENGTH;
-import static name.maxdeliso.teflon.Main.MESSAGE_MARSHALLER;
-import static name.maxdeliso.teflon.Main.TRANSFER_QUEUE;
+import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+import static name.maxdeliso.teflon.Main.BUFFER_LENGTH;
+import static name.maxdeliso.teflon.Main.DEFAULT_UDP_PORT;
+import static name.maxdeliso.teflon.Main.MESSAGE_MARSHALLER;
+import static name.maxdeliso.teflon.Main.MULTICAST_IPV4_BIND_ADDRESS;
+import static name.maxdeliso.teflon.Main.MULTICAST_IPV6_BIND_ADDRESS;
+import static name.maxdeliso.teflon.Main.TRANSFER_QUEUE;
+import name.maxdeliso.teflon.commands.CommandProcessor;
+import name.maxdeliso.teflon.data.Message;
+import name.maxdeliso.teflon.data.MessageTracker;
+import name.maxdeliso.teflon.net.ConnectionManager;
+import name.maxdeliso.teflon.net.ConnectionResult;
+import name.maxdeliso.teflon.net.NetSelector;
+import name.maxdeliso.teflon.net.NetworkInterfaceManager;
+
+/**
+ * Main application window for the Teflon chat client.
+ * Handles the UI layout, network connections, and message display.
+ */
 public class MainFrame extends JFrame {
+    /**
+     * Logger for this class.
+     */
     private static final Logger LOG = LogManager.getLogger(MainFrame.class);
 
-    private static final int FRAME_WIDTH = 512;
-    private static final int FRAME_HEIGHT = 316;
-    private static final String FRAME_TITLE = "Teflon";
+    /**
+     * Default window width.
+     */
+    private static final int DEFAULT_WIDTH = 800;
 
-    // Menu items
-    private final JMenuItem connectMenuItem = new JMenuItem("Connect");
-    private final JMenuItem disconnectMenuItem = new JMenuItem("Disconnect");
-    private final JMenuItem aboutMenuItem = new JMenuItem("About");
+    /**
+     * Default window height.
+     */
+    private static final int DEFAULT_HEIGHT = 600;
 
-    // Status bar (top)
-    private final JTextField statusTextField = createStatusTextField();
-    // Networking and domain objects
-    private final ExecutorService netExecutor;
+    /**
+     * Title of the main window.
+     */
+    private static final String WINDOW_TITLE = "Teflon";
+
+    /**
+     * Application icon image.
+     */
+    private static final java.awt.image.BufferedImage APP_ICON =
+            ImageLoader.loadImage("/images/icon.jpg", MainFrame.class);
+
+    /**
+     * Chat panel for displaying messages.
+     */
+    private final ChatPanel chatPanel;
+
+    /**
+     * Status panel for displaying connection status.
+     */
+    private final StatusPanel statusPanel;
+
+    /**
+     * Message composer for input.
+     */
+    private final MessageComposer messageComposer;
+
+    /**
+     * Menu item for connection.
+     */
+    private final JMenuItem connectMenuItem;
+
+    /**
+     * Menu item for disconnection.
+     */
+    private final JMenuItem disconnectMenuItem;
+
+    /**
+     * Menu item for about dialog.
+     */
+    private final JMenuItem aboutMenuItem;
+
+    /**
+     * Unique identifier for this instance.
+     */
     private final UUID uuid;
+
+    /**
+     * Consumer for handling messages.
+     */
     private final Consumer<Message> messageConsumer;
-    // Input field (bottom)
-    private final JTextField inputTextField = createInputTextField();
-    private final ConnectionManager cm;
-    private final NetworkInterfaceManager nim;
-    // A JEditorPane for HTML content
-    private final JEditorPane messagePane = createMessagePane();
-    // We'll accumulate the conversation in a StringBuilder
-    private final StringBuilder htmlBuffer = new StringBuilder("<html><body>");
-    // Simple date formatter for incoming messages
-    private final DateFormat dateFormat = DateFormat.getTimeInstance(DateFormat.SHORT);
-    // Connection dialog
-    private ConnectionDialog connectionDialog = null;
-    // Holds the current connection info (if any)
-    private ConnectionResult connectionResult = null;
-
-    public MainFrame(final UUID uuid,
-                     final Consumer<Message> messageConsumer,
-                     ExecutorService netExecutor,
-                     ConnectionManager connectionManager,
-                     NetworkInterfaceManager networkInterfaceManager) {
-        this.uuid = uuid;
-        this.messageConsumer = messageConsumer;
-        this.netExecutor = netExecutor;
-        this.cm = connectionManager;
-        this.nim = networkInterfaceManager;
-
-        // Set a custom icon from the classpath
-        var iconResource = getClass().getResource("/images/icon.jpg");
-        if (iconResource != null) {
-            Image iconImage = new ImageIcon(iconResource).getImage();
-            setIconImage(iconImage);
-        }
-
-        // Basic frame settings
-        setTitle(FRAME_TITLE);
-        setSize(FRAME_WIDTH, FRAME_HEIGHT);
-        setLayout(new BorderLayout());
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        // Add top status text
-        add(statusTextField, BorderLayout.PAGE_START);
-
-        // Add our message pane in the center
-        // A scroll pane containing the messagePane
-        javax.swing.JScrollPane messageScrollPane = new javax.swing.JScrollPane(messagePane);
-        add(messageScrollPane, BorderLayout.CENTER);
-
-        // Add input field at bottom
-        add(new JScrollPane(inputTextField), BorderLayout.PAGE_END);
-
-        // Set up the menu bar
-        setJMenuBar(setupMenuBar());
-
-        // Start in disconnected state
-        updateConnectivityState(false);
-    }
 
     /**
-     * Creates a non-editable text field to show connection status.
+     * Executor for network operations.
      */
-    private JTextField createStatusTextField() {
-        JTextField textField = new JTextField("disconnected");
-        textField.setEditable(false);
-        textField.setHorizontalAlignment(SwingConstants.CENTER);
-        return textField;
-    }
+    private final ExecutorService executor;
 
     /**
-     * Creates the input field that sends a Message when user presses Enter.
+     * Manager for network connections.
      */
-    private JTextField createInputTextField() {
-        JTextField textField = new JTextField();
-        textField.setEditable(false);
-        textField.addKeyListener(new KeyAdapter() {
-            @Override
-            public void keyReleased(final KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    var outgoing = new Message(uuid.toString(), textField.getText());
-                    messageConsumer.accept(outgoing);
-                    textField.setText("");
+    private final ConnectionManager connectionManager;
+
+    /**
+     * Manager for network interfaces.
+     */
+    private final NetworkInterfaceManager networkInterfaceManager;
+    /**
+     * Message tracker for handling acknowledgments.
+     */
+    private final MessageTracker messageTracker;
+    /**
+     * Command processor for handling chat commands.
+     */
+    private final CommandProcessor commandProcessor;
+    /**
+     * Current connection result.
+     */
+    private ConnectionResult connectionResult;
+    /**
+     * Dialog for connection configuration.
+     */
+    private ConnectionDialog connectionDialog;
+    /**
+     * Indicates if the instance is connected.
+     */
+    private boolean connected;
+
+    /**
+     * Creates a new main frame.
+     *
+     * @param id           Unique identifier for this instance
+     * @param msgConsumer  Consumer for handling messages
+     * @param executor     Executor for network operations
+     * @param connManager  Manager for network connections
+     * @param ifaceManager Manager for network interfaces
+     */
+    public MainFrame(final UUID id,
+                     final Consumer<Message> msgConsumer,
+                     final ExecutorService executor,
+                     final ConnectionManager connManager,
+                     final NetworkInterfaceManager ifaceManager) {
+        this.uuid = id;
+        this.executor = executor;
+        this.connectionManager = connManager;
+        this.networkInterfaceManager = ifaceManager;
+        this.messageTracker = new MessageTracker(id.toString());
+
+        // Initialize UI components first
+        this.chatPanel = new ChatPanel();
+        this.statusPanel = new StatusPanel();
+        this.commandProcessor = new CommandProcessor(msg -> chatPanel.renderSystemEvent("#757575", "System", msg));
+        this.messageConsumer = msgConsumer;  // Use the original message consumer directly
+        this.messageComposer = new MessageComposer(
+                id,
+                this.messageConsumer,
+                messageTracker,
+                commandProcessor,
+                chatPanel,
+                statusPanel
+        );
+        this.connectMenuItem = new JMenuItem("Connect...");
+        this.disconnectMenuItem = new JMenuItem("Disconnect");
+        this.aboutMenuItem = new JMenuItem("About");
+
+        // Set initial status
+        this.statusPanel.updateStatus(false, "disconnected");
+
+        // Register built-in commands
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "help",
+                "Show this help message",
+                messageComposer::displayHelp
+        ));
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "status",
+                "Display connection status and message statistics",
+                messageComposer::displayStatus
+        ));
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "html",
+                "Display the raw HTML content of the chat panel",
+                messageComposer::displayHtml
+        ));
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "connect",
+                "Open the connection dialog or quick connect with IPv4/IPv6 (usage: /connect [4|6])",
+                args -> {
+                    List<String> argList = Arrays.asList(args);
+                    if (argList.isEmpty()) {
+                        showConnectionDialog();
+                    } else if (argList.size() == 1) {
+                        String version = argList.getFirst();
+                        NetworkInterface defaultInterface = networkInterfaceManager.queryInterfaces().getFirst();
+                        switch (version) {
+                            case "4" -> handleConnectionResult(connectionManager.connectMulticast(
+                                    MULTICAST_IPV4_BIND_ADDRESS,
+                                    DEFAULT_UDP_PORT,
+                                    defaultInterface
+                            ).join());
+                            case "6" -> handleConnectionResult(connectionManager.connectMulticast(
+                                    MULTICAST_IPV6_BIND_ADDRESS,
+                                    DEFAULT_UDP_PORT,
+                                    defaultInterface
+                            ).join());
+                            default -> chatPanel
+                                    .renderSystemEvent("#C62828", "Error", "Invalid IP version. Use '4' or '6'.");
+                        }
+                    } else {
+                        chatPanel.renderSystemEvent("#C62828", "Error", "Too many arguments. Usage: /connect [4|6]");
+                    }
                 }
-            }
-        });
-        return textField;
+        ));
+
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "disconnect",
+                "Disconnect from the current chat session",
+                args -> handleDisconnect()
+        ));
+
+        commandProcessor.registerCommand(new name.maxdeliso.teflon.commands.ChatCommand(
+                "quit",
+                "Exit the application",
+                args -> {
+                    dispose();
+                    System.exit(0);
+                }
+        ));
+
+        initializeComponents();
+        connectMenuItem.setEnabled(true);
+        disconnectMenuItem.setEnabled(false);
     }
 
     /**
-     * Creates a JEditorPane that uses HTML content.
+     * Gets the current connection result.
+     *
+     * @return The current connection result, or null if not connected
      */
-    private JEditorPane createMessagePane() {
-        JEditorPane editor = new JEditorPane();
-        editor.setContentType("text/html");
-        editor.setEditable(false);
-        editor.setText("<html><body></body></html>");
-        return editor;
+    public ConnectionResult getConnectionResult() {
+        return connectionResult;
     }
 
     /**
-     * Sets up the menu bar with Connect, Disconnect, and About items.
+     * Initialize the UI components.
      */
-    private JMenuBar setupMenuBar() {
-        var mb = new JMenuBar();
-        var menu = new JMenu("Main");
+    protected void initializeComponents() {
+        setTitle(WINDOW_TITLE);
+        setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        setSize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        setLocationRelativeTo(null);
+        setIconImage(APP_ICON);
 
-        connectMenuItem.addActionListener(ev -> showConnectionModal());
-        menu.add(connectMenuItem);
+        setJMenuBar(createMenuBar());
 
-        disconnectMenuItem.addActionListener(ev -> disconnect());
-        menu.add(disconnectMenuItem);
+        // Set up main layout
+        getContentPane().setLayout(new BorderLayout());
+        getContentPane().add(chatPanel, BorderLayout.CENTER);
+        getContentPane().add(statusPanel, BorderLayout.SOUTH);
+        getContentPane().add(messageComposer, BorderLayout.NORTH);
 
-        aboutMenuItem.addActionListener(ev -> showAboutDialog());
-        menu.add(aboutMenuItem);
+        // Set up event handlers
+        connectMenuItem.addActionListener(e -> showConnectionDialog());
+        disconnectMenuItem.addActionListener(e -> handleDisconnect());
+        aboutMenuItem.addActionListener(e -> showAboutDialog());
+    }
 
-        mb.add(menu);
-        return mb;
+    private JMenuBar createMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        JMenu fileMenu = new JMenu("File");
+        JMenu helpMenu = new JMenu("Help");
+
+        fileMenu.add(connectMenuItem);
+        fileMenu.add(disconnectMenuItem);
+        helpMenu.add(aboutMenuItem);
+
+        menuBar.add(fileMenu);
+        menuBar.add(helpMenu);
+
+        return menuBar;
     }
 
     /**
-     * Shows the ConnectionDialog for selecting interface, IP, and port.
+     * Gets the connection dialog.
+     *
+     * @return The connection dialog
      */
-    private void showConnectionModal() {
+    public ConnectionDialog getConnectionDialog() {
+        return connectionDialog;
+    }
+
+    void showConnectionDialog() {
         if (connectionDialog == null) {
             connectionDialog = new ConnectionDialog(
                     this,
-                    nim.queryInterfaces(),
+                    networkInterfaceManager.queryInterfaces(),
                     this::handleConnectionResult,
-                    cm
+                    connectionManager
             );
         }
         connectionDialog.setVisible(true);
     }
 
-    /**
-     * Called after the user successfully connects in the ConnectionDialog.
-     */
-    private void handleConnectionResult(ConnectionResult connectionResult) {
-        this.connectionResult = connectionResult;
-        updateConnectivityState(true);
-        updateStatusText("connected: " + connectionResult);
-
-        SwingUtilities.invokeLater(() -> connectionDialog.setVisible(false));
-
-        CompletableFuture
-                .supplyAsync(() -> createNetSelector(connectionResult), netExecutor)
-                .thenApplyAsync(netSelector -> {
-                    try {
-                        return netSelector.selectLoop();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+    void handleConnectionResult(final ConnectionResult result) {
+        this.connectionResult = result;
+        LOG.info("Connection successful: {}", formatMembershipInfo(result));
+        CompletableFuture.supplyAsync(() -> createNetSelector(result), executor)
+                .thenAccept(selector -> {
+                    updateConnectivityState(true);
+                    statusPanel.updateStatus(true, "connected: " + formatMembershipInfo(result));
+                    chatPanel.renderSystemEvent("#2E7D32", "Connected", formatMembershipInfo(result));
+                    if (connectionDialog != null) {
+                        connectionDialog.setVisible(false);
+                        connectionDialog.dispose();
+                        connectionDialog = null;
                     }
-                }, netExecutor)
-                .thenAccept(result -> handleDisconnect())
+                    SwingUtilities.invokeLater(() -> messageComposer.getInputTextField().requestFocusInWindow());
+                    try {
+                        selector.selectLoop();
+                    } catch (IOException e) {
+                        handleError(e);
+                    }
+                })
                 .exceptionally(this::handleError);
     }
 
@@ -218,80 +351,154 @@ public class MainFrame extends JFrame {
                 // Incoming message handler
                 (_address, bb) -> MESSAGE_MARSHALLER
                         .bufferToMessage(bb)
-                        .ifPresent(msg -> SwingUtilities.invokeLater(() -> renderMessage(msg))),
+                        .ifPresent(msg -> SwingUtilities.invokeLater(() -> processIncomingMessage(msg))),
                 // Outgoing message supplier
-                () -> Optional
-                        .ofNullable(TRANSFER_QUEUE.poll())
+                () -> ofNullable(TRANSFER_QUEUE.poll())
                         .map(MESSAGE_MARSHALLER::messageToBuffer)
                         .orElse(null)
         );
     }
 
-    private void renderMessage(final Message msg) {
-        var timeString = dateFormat.format(new Date());
+    /**
+     * Process an incoming message.
+     *
+     * @param message The message to process
+     */
+    public void processIncomingMessage(Message message) {
+        if (message.isAcknowledgment()) {
+            messageTracker.processAcknowledgment(message);
+            chatPanel.renderAcknowledgment(
+                    message.type() == Message.MessageType.ACK ? "#2E7D32" : "#C62828",
+                    message.originalMessageId().toString(),
+                    message.senderId());
+        } else {
+            messageTracker.trackMessage(message);
+            chatPanel.renderMessage(
+                    message.type() == Message.MessageType.SYSTEM_EVENT ? "#757575" : message.generateColor(),
+                    message.senderId(),
+                    message.htmlSafeBody(),
+                    new Date());
 
-        var newMessageHtml =
-                "<p style=\"margin:0; padding:0;\">"
-                        + "  <span style=\"color:" + msg.generateColor() + "; font-weight:bold;\""
-                        + "        title=\"" + msg.senderId() + "\">"
-                        + msg.senderId().substring(0, 8)
-                        + "  </span>"
-                        + "  <span style=\"color:gray; font-size:small;\">&nbsp;[" + timeString + "]</span>"
-                        + "  <br/>"
-                        + msg.htmlSafeBody()
-                        + "</p>";
-
-        htmlBuffer.append(newMessageHtml);
-        messagePane.setText(htmlBuffer + "</body></html>");
-
-        SwingUtilities.invokeLater(() -> {
-            messagePane.setCaretPosition(messagePane.getDocument().getLength());
-        });
-    }
-
-    private void disconnect() {
-        if (connectionResult != null && connectionResult.getDc().isOpen()) {
-            try {
-                connectionResult.getDc().close();
-                updateStatusText("disconnected");
-            } catch (IOException e) {
-                LOG.error("error while disconnecting", e);
-                updateStatusText("error: " + e.getMessage());
-            } finally {
-                updateConnectivityState(false);
-                connectionResult = null;
-            }
+            // Send acknowledgment for received messages
+            Message ack = Message.createAcknowledgment(uuid.toString(), message.messageId(), true);
+            messageConsumer.accept(ack);
         }
     }
 
     private void handleDisconnect() {
-        updateConnectivityState(false);
-        updateStatusText("disconnected");
+        if (connectionResult != null) {
+            try {
+                connectionResult.getMembershipKey().drop();
+                connectionResult = null;
+                updateConnectivityState(false);
+                statusPanel.updateStatus(false, "disconnected");
+                chatPanel.renderSystemEvent("#757575", "Disconnected", "Connection closed");
+            } catch (Exception e) {
+                LOG.error("Error during disconnect", e);
+                statusPanel.updateStatus(false, "error: " + e.getMessage());
+            }
+        }
     }
 
-    private Void handleError(Throwable ex) {
-        LOG.error("exception in net loop", ex);
-        updateConnectivityState(false);
-        updateStatusText("error: " + ex.getMessage());
+    private Void handleError(final Throwable ex) {
+        LOG.error("Error in network operation", ex);
+        statusPanel.updateStatus(false, "error: " + ex.getMessage());
+        chatPanel.renderSystemEvent("#C62828", "Error", ex.getMessage());
         return null;
     }
 
-    private void updateConnectivityState(boolean isConnected) {
-        SwingUtilities.invokeLater(() -> {
-            inputTextField.setEditable(isConnected);
-            connectMenuItem.setEnabled(!isConnected);
-            disconnectMenuItem.setEnabled(isConnected);
-        });
-    }
-
-    private void updateStatusText(String text) {
-        SwingUtilities.invokeLater(() -> {
-            statusTextField.setText(text);
-        });
+    public void updateConnectivityState(final boolean isConnected) {
+        this.connected = isConnected;
+        connectMenuItem.setEnabled(!isConnected);
+        disconnectMenuItem.setEnabled(isConnected);
+        messageComposer.updateConnectionStatus(isConnected);
     }
 
     private void showAboutDialog() {
-        AboutDialog aboutModal = new AboutDialog(this);
-        aboutModal.setVisible(true);
+        AboutDialog aboutDialog = new AboutDialog(this);
+        aboutDialog.setVisible(true);
+    }
+
+    public String formatMembershipInfo(final ConnectionResult result) {
+        return String.format("%s:%d on %s",
+                result.getMembershipKey().group().getHostAddress(),
+                result.getPort(),
+                result.getMembershipKey().networkInterface().getName());
+    }
+
+    /**
+     * Gets the input text field from the message composer.
+     *
+     * @return The input text field
+     */
+    public JTextField getInputTextField() {
+        return messageComposer.getInputTextField();
+    }
+
+    /**
+     * Gets the status panel.
+     *
+     * @return The status panel
+     */
+    public StatusPanel getStatusPanel() {
+        return statusPanel;
+    }
+
+    /**
+     * Gets the message composer.
+     *
+     * @return The message composer
+     */
+    public MessageComposer getMessageComposer() {
+        return messageComposer;
+    }
+
+    /**
+     * Gets the chat panel.
+     *
+     * @return The chat panel
+     */
+    public ChatPanel getChatPanel() {
+        return chatPanel;
+    }
+
+    /**
+     * Gets the connect menu item.
+     *
+     * @return The connect menu item
+     */
+    public JMenuItem getConnectMenuItem() {
+        return connectMenuItem;
+    }
+
+    /**
+     * Gets the disconnect menu item.
+     *
+     * @return The disconnect menu item
+     */
+    public JMenuItem getDisconnectMenuItem() {
+        return disconnectMenuItem;
+    }
+
+    /**
+     * Gets the about menu item.
+     *
+     * @return The about menu item
+     */
+    public JMenuItem getAboutMenuItem() {
+        return aboutMenuItem;
+    }
+
+    @Override
+    public void dispose() {
+        if (connectionResult != null) {
+            try {
+                connectionResult.getMembershipKey().drop();
+            } catch (Exception e) {
+                LOG.error("Error closing connection", e);
+            }
+        }
+        messageTracker.shutdown();
+        super.dispose();
     }
 }

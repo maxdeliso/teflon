@@ -8,14 +8,29 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-public class JsonMessageMarshaller implements MessageMarshaller {
+/**
+ * Implementation of MessageMarshaller that uses JSON for serialization.
+ * Uses GSON for JSON conversion and UTF-8 for character encoding.
+ */
+public final class JsonMessageMarshaller implements MessageMarshaller {
 
+    /**
+     * Character set used for message encoding/decoding.
+     */
     private static final Charset MESSAGE_CHARSET = StandardCharsets.UTF_8;
 
+    /**
+     * GSON instance for JSON serialization/deserialization.
+     */
     private final Gson gson;
 
-    public JsonMessageMarshaller(Gson gson) {
-        this.gson = gson;
+    /**
+     * Creates a new JSON message marshaller.
+     *
+     * @param gsonInstance The GSON instance to use for JSON conversion
+     */
+    public JsonMessageMarshaller(final Gson gsonInstance) {
+        this.gson = gsonInstance;
     }
 
     @Override
