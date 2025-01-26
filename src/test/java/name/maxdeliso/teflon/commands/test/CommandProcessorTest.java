@@ -1,4 +1,7 @@
-package name.maxdeliso.teflon.commands;
+package name.maxdeliso.teflon.commands.test;
+
+import name.maxdeliso.teflon.commands.Command;
+import name.maxdeliso.teflon.commands.CommandProcessor;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

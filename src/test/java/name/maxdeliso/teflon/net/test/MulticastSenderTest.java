@@ -1,25 +1,27 @@
-package name.maxdeliso.teflon.net;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+package name.maxdeliso.teflon.net.test;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.Mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import name.maxdeliso.teflon.net.MulticastSender;
 
 @ExtendWith(MockitoExtension.class)
-class MulticastSenderTest {
+public class MulticastSenderTest {
 
     @Mock
     private DatagramChannel datagramChannel;
@@ -28,6 +30,9 @@ class MulticastSenderTest {
     private InetSocketAddress socketAddress;
 
     private MulticastSender sender;
+
+    @Mock
+    private DatagramSocket mockSocket;
 
     @BeforeEach
     void setUp() {

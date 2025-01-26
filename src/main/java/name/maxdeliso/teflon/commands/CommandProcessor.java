@@ -1,11 +1,11 @@
 package name.maxdeliso.teflon.commands;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 /**
  * Processes chat commands.
@@ -88,8 +88,8 @@ public class CommandProcessor {
         StringBuilder helpText = new StringBuilder("Available commands:\n");
         commands.forEach((name, command) -> {
             String commandHelp = String.format("• /%s - %s\n",
-                org.apache.commons.text.StringEscapeUtils.escapeHtml4(name),
-                org.apache.commons.text.StringEscapeUtils.escapeHtml4(command.getDescription()));
+                    org.apache.commons.text.StringEscapeUtils.escapeHtml4(name),
+                    org.apache.commons.text.StringEscapeUtils.escapeHtml4(command.getDescription()));
             helpText.append(commandHelp);
         });
         return helpText.toString();

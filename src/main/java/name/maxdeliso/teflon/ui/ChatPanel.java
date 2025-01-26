@@ -1,20 +1,21 @@
 package name.maxdeliso.teflon.ui;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
+import java.awt.BorderLayout;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import static java.util.Objects.requireNonNull;
 
 import javax.swing.JEditorPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
-import java.awt.BorderLayout;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import javax.swing.event.DocumentListener;
 
-import static java.util.Objects.requireNonNull;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 
 /**
  * Panel for displaying chat messages.
@@ -49,6 +50,12 @@ public class ChatPanel extends JPanel {
      */
     private static final String ACK_TEMPLATE =
             TemplateLoader.loadTemplate("/templates/ack-template.html", ChatPanel.class);
+
+    /**
+     * Stats template for HTML formatting.
+     */
+    private static final String STATS_TEMPLATE =
+            TemplateLoader.loadTemplate("/templates/status-stats-template.html", ChatPanel.class);
 
     /**
      * Number of characters to show in truncated sender ID.
@@ -87,7 +94,7 @@ public class ChatPanel extends JPanel {
         pane.setCursor(java.awt.Cursor.getDefaultCursor());
         pane.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
 
-        pane.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+        pane.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(javax.swing.event.DocumentEvent e) {
                 LOG.debug("Document updated: {}", pane.getText());
@@ -160,6 +167,35 @@ public class ChatPanel extends JPanel {
                 truncatedId,
                 dateFormat.format(new Date()));
         appendToMessagePane(formattedMessage);
+    }
+
+    /**
+     * Renders message statistics.
+     *
+     * @param statusColor The color to use for the status
+     * @param connectionStatus The connection status text
+     * @param messagesSent Number of messages sent
+     * @param acksReceived Number of acknowledgments received
+     * @param nacksReceived Number of negative acknowledgments received
+     * @param messagesTimedOut Number of messages that timed out
+     * @param pendingMessages Number of pending messages
+     */
+    public void renderMessageStats(String statusColor,
+                                 String connectionStatus,
+                                 long messagesSent,
+                                 long acksReceived,
+                                 long nacksReceived,
+                                 long messagesTimedOut,
+                                 long pendingMessages) {
+        String formattedStats = String.format(STATS_TEMPLATE,
+                statusColor,
+                connectionStatus,
+                messagesSent,
+                acksReceived,
+                nacksReceived,
+                messagesTimedOut,
+                pendingMessages);
+        appendToMessagePane(formattedStats);
     }
 
     private String getColorStyle(String color) {

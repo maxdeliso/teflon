@@ -56,13 +56,13 @@ This project is being actively developed using various AI coding assistants to e
 ### Building
 
 ```bash
-./mvnw clean package
+mvn clean package
 ```
 
 ### Running
 
 ```bash
-java -jar target/teflon-1.2.0-jar-with-dependencies.jar
+mvn exec:java
 ```
 
 ### Available Commands
@@ -88,26 +88,10 @@ java -jar target/teflon-1.2.0-jar-with-dependencies.jar
 
 ### Testing
 
-The project includes comprehensive test coverage:
+The project includes some test coverage:
 
 ```bash
-./mvnw test
-```
-
-### Code Style
-
-Follows standard Java conventions, enforced by Checkstyle:
-
-```bash
-./mvnw checkstyle:check
-```
-
-### Code Coverage
-
-JaCoCo is used for code coverage analysis:
-
-```bash
-./mvnw jacoco:report
+mvn test
 ```
 
 ## References
@@ -123,6 +107,13 @@ JaCoCo is used for code coverage analysis:
 - [Java Swing Documentation](https://docs.oracle.com/javase/tutorial/uiswing/)
 
 ## Version History
+
+### 1.3.1
+
+- Optimize out busy-wait in the net selector
+- Add additional multicast delivery options
+- Improve test strategy
+- Fix some threading issues and reconnection
 
 ### 1.3.0
 

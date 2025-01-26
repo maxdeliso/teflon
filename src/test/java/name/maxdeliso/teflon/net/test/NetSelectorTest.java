@@ -1,15 +1,9 @@
-package name.maxdeliso.teflon.net;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.junit.jupiter.MockitoExtension;
+package name.maxdeliso.teflon.net.test;
 
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
@@ -19,24 +13,60 @@ import java.nio.channels.Selector;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import name.maxdeliso.teflon.net.ConnectionResult;
+import name.maxdeliso.teflon.net.MessageSource;
+import name.maxdeliso.teflon.net.NetSelector;
 
 @ExtendWith(MockitoExtension.class)
-class NetSelectorTest {
+public class NetSelectorTest {
+
+    private static final class SupplierMessageSource implements MessageSource {
+        private final Supplier<ByteBuffer> supplier;
+        private ByteBuffer currentBuffer;
+
+        SupplierMessageSource(Supplier<ByteBuffer> supplier) {
+            this.supplier = supplier;
+        }
+
+        @Override
+        public ByteBuffer peek() {
+            if (currentBuffer == null) {
+                currentBuffer = supplier.get();
+            }
+            return currentBuffer;
+        }
+
+        @Override
+        public ByteBuffer poll() {
+            ByteBuffer buffer = currentBuffer;
+            currentBuffer = null;
+            return buffer;
+        }
+    }
 
     private static final int BUFFER_LENGTH = 1024;
     private static final int TEST_PORT = 12345;
@@ -63,8 +93,13 @@ class NetSelectorTest {
     private NetSelector netSelector;
     private InetAddress groupAddress;
 
+    @Mock
+    private MessageSource messageSource;
+
+    @Mock
+    private NetworkInterface networkInterface;
+
     @BeforeEach
-    @SuppressWarnings("unused")
     void setUp() throws IOException {
         groupAddress = InetAddress.getByName("239.255.255.250");
         connectionResult = new ConnectionResult(
@@ -77,14 +112,10 @@ class NetSelectorTest {
                 BUFFER_LENGTH,
                 connectionResult,
                 messageConsumer,
-                messageSupplier
+                new SupplierMessageSource(messageSupplier)
         );
 
-        // Default behavior for mocks
-        when(membershipKey.isValid()).thenReturn(true);
-        when(membershipKey.group()).thenReturn(groupAddress);
-
-        // Mock selector behavior
+        // Mock selector behavior - only what's needed for all tests
         Set<SelectionKey> selectedKeys = new HashSet<>();
         selectedKeys.add(selectionKey);
         when(selector.select()).thenReturn(1);
@@ -93,6 +124,15 @@ class NetSelectorTest {
 
         // Mock channel registration
         when(datagramChannel.register(any(Selector.class), anyInt())).thenReturn(selectionKey);
+
+        // Mock network interface for logging - needed by all tests
+        when(membershipKey.group()).thenReturn(groupAddress);
+        when(membershipKey.networkInterface()).thenReturn(networkInterface);
+        when(networkInterface.getName()).thenReturn("test-interface");
+
+        // Default state for channel and membership key
+        when(membershipKey.isValid()).thenReturn(true);
+        when(datagramChannel.isOpen()).thenReturn(true);
     }
 
     @Test
@@ -112,10 +152,11 @@ class NetSelectorTest {
             return sender;
         }).thenReturn(null);  // Return null to end the loop
 
-        // Mock membership key to become invalid after first iteration
+        // Mock membership key and channel state for cleanup
         when(membershipKey.isValid())
-                .thenReturn(true)
-                .thenReturn(false);
+                .thenReturn(true, true, false);  // Stay valid for one iteration
+        when(datagramChannel.isOpen())
+                .thenReturn(true, true, false);  // Stay open for one iteration
 
         try (MockedStatic<Selector> selectorStatic = mockStatic(Selector.class)) {
             selectorStatic.when(Selector::open).thenReturn(selector);
@@ -143,10 +184,15 @@ class NetSelectorTest {
                 .thenReturn(testBuffer)
                 .thenReturn(null);  // Return null to end the loop
 
-        // Mock membership key to become invalid after first iteration
+        // Mock channel behavior for successful send
+        when(datagramChannel.send(any(ByteBuffer.class), any(SocketAddress.class)))
+                .thenReturn(testBuffer.remaining());
+
+        // Mock membership key and channel state for cleanup
         when(membershipKey.isValid())
-                .thenReturn(true)
-                .thenReturn(false);
+                .thenReturn(true, true, false);  // Stay valid for one iteration
+        when(datagramChannel.isOpen())
+                .thenReturn(true, true, false);  // Stay open for one iteration
 
         try (MockedStatic<Selector> selectorStatic = mockStatic(Selector.class)) {
             selectorStatic.when(Selector::open).thenReturn(selector);
@@ -166,8 +212,11 @@ class NetSelectorTest {
         when(selectionKey.isReadable()).thenReturn(false);
         when(selectionKey.isWritable()).thenReturn(false);
 
-        // Mock membership key to become invalid after first check
+        // Mock membership key and channel state for cleanup
         when(membershipKey.isValid())
+                .thenReturn(true)
+                .thenReturn(false);
+        when(datagramChannel.isOpen())
                 .thenReturn(true)
                 .thenReturn(false);
 
@@ -192,15 +241,24 @@ class NetSelectorTest {
         when(datagramChannel.receive(any(ByteBuffer.class)))
                 .thenThrow(new IOException("Test error"));
 
+        // Mock membership key and channel state to terminate after error
+        when(membershipKey.isValid())
+                .thenReturn(true, false); // Return true once, then false
+        when(datagramChannel.isOpen())
+                .thenReturn(true, false); // Return true once, then false
+
         try (MockedStatic<Selector> selectorStatic = mockStatic(Selector.class)) {
             selectorStatic.when(Selector::open).thenReturn(selector);
 
-            // Run the selector loop and expect IOException
+            // Run the selector loop and verify it throws the expected exception
             try {
                 netSelector.selectLoop();
-                fail("Expected IOException was not thrown");
-            } catch (IOException e) {
-                assertEquals("Test error", e.getMessage());
+                fail("Expected an IOException to be thrown");
+            } catch (IOException | CompletionException e) {
+                // Unwrap CompletionException if present
+                Throwable cause = e instanceof CompletionException ? e.getCause() : e;
+                assertInstanceOf(java.io.IOException.class, cause);
+                assertEquals("Test error", cause.getMessage());
             }
         }
     }

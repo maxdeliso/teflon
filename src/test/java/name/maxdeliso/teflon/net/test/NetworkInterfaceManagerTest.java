@@ -1,12 +1,4 @@
-package name.maxdeliso.teflon.net;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
-import org.mockito.junit.jupiter.MockitoExtension;
+package name.maxdeliso.teflon.net.test;
 
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -15,22 +7,30 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import name.maxdeliso.teflon.net.NetworkInterfaceManager;
 
 @ExtendWith(MockitoExtension.class)
-class NetworkInterfaceManagerTest {
+public class NetworkInterfaceManagerTest {
+    private NetworkInterfaceManager networkInterfaceManager;
 
     @Mock
-    private NetworkInterface networkInterface;
-
-    private NetworkInterfaceManager manager;
+    private NetworkInterface mockInterface;
 
     @BeforeEach
     void setUp() {
-        manager = new NetworkInterfaceManager();
+        networkInterfaceManager = new NetworkInterfaceManager();
     }
 
     @Test
@@ -39,7 +39,7 @@ class NetworkInterfaceManagerTest {
             mockedStatic.when(NetworkInterface::getNetworkInterfaces)
                     .thenReturn(Collections.enumeration(Collections.emptyList()));
 
-            List<NetworkInterface> result = manager.queryInterfaces();
+            List<NetworkInterface> result = networkInterfaceManager.queryInterfaces();
             assertTrue(result.isEmpty());
         }
     }
@@ -50,7 +50,7 @@ class NetworkInterfaceManagerTest {
             mockedStatic.when(NetworkInterface::getNetworkInterfaces)
                     .thenThrow(new SocketException("Test exception"));
 
-            List<NetworkInterface> result = manager.queryInterfaces();
+            List<NetworkInterface> result = networkInterfaceManager.queryInterfaces();
             assertTrue(result.isEmpty());
         }
     }
@@ -93,7 +93,7 @@ class NetworkInterfaceManagerTest {
                 networkInterfaceMockedStatic.when(NetworkInterface::getNetworkInterfaces)
                         .thenReturn(Collections.enumeration(Collections.singletonList(networkInterface)));
 
-                List<NetworkInterface> interfaces = manager.queryInterfaces();
+                List<NetworkInterface> interfaces = networkInterfaceManager.queryInterfaces();
 
                 assertTrue(interfaces.isEmpty());
                 verify(networkInterface).supportsMulticast();
@@ -105,13 +105,13 @@ class NetworkInterfaceManagerTest {
 
     @Test
     void testQueryInterfacesWithSocketExceptionDuringFiltering() throws SocketException {
-        when(networkInterface.isUp()).thenThrow(new SocketException("Test exception"));
+        when(mockInterface.isUp()).thenThrow(new SocketException("Test exception"));
 
         try (MockedStatic<NetworkInterface> mockedStatic = Mockito.mockStatic(NetworkInterface.class)) {
             mockedStatic.when(NetworkInterface::getNetworkInterfaces)
-                    .thenReturn(Collections.enumeration(List.of(networkInterface)));
+                    .thenReturn(Collections.enumeration(List.of(mockInterface)));
 
-            List<NetworkInterface> result = manager.queryInterfaces();
+            List<NetworkInterface> result = networkInterfaceManager.queryInterfaces();
             assertTrue(result.isEmpty());
         }
     }

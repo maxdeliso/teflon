@@ -84,14 +84,29 @@ public class ConnectionManager {
         try {
             var family = protocolFamilyForAddress(addr);
             var dc = DatagramChannel.open(family);
+
+            // Common options for both IPv4 and IPv6
             dc.setOption(StandardSocketOptions.SO_REUSEADDR, true);
             dc.setOption(StandardSocketOptions.IP_MULTICAST_IF, netIf);
+            dc.setOption(StandardSocketOptions.IP_MULTICAST_TTL, 8);
+            dc.setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true);
+
+            if (family == StandardProtocolFamily.INET6) {
+                LOG.debug("Configuring IPv6 channel for {}", addr);
+                // For IPv6, bind to any address (::) to receive multicast
+                dc.bind(new InetSocketAddress("::", port));
+            } else {
+                LOG.debug("Configuring IPv4 channel for {}", addr);
+                // For IPv4, bind to any address (0.0.0.0) to receive multicast
+                dc.bind(new InetSocketAddress(port));
+            }
+
             dc.configureBlocking(false);
-            dc.bind(new InetSocketAddress(port));
+            LOG.debug("Channel configured and bound successfully");
             return dc;
         } catch (IOException e) {
-            String msg = String.format("Failed to open or bind channel for %s on interface %s",
-                    addr, netIf);
+            String msg = String.format("Failed to open or bind channel for %s on interface %s: %s",
+                    addr, netIf, e.getMessage());
             LOG.error(msg, e);
             throw new CompletionException(msg, e);
         }
@@ -110,6 +125,16 @@ public class ConnectionManager {
                                     final InetAddress groupAddr,
                                     final NetworkInterface netIf) {
         try {
+            // For IPv6, we need to ensure the scope ID is set for link-local addresses
+            if (groupAddr instanceof Inet6Address && groupAddr.isLinkLocalAddress()) {
+                // Create a new IPv6 address with the correct scope ID
+                var ipv6Addr = Inet6Address.getByAddress(
+                        null,
+                        groupAddr.getAddress(),
+                        netIf
+                );
+                return channel.join(ipv6Addr, netIf);
+            }
             return channel.join(groupAddr, netIf);
         } catch (IOException e) {
             String msg = String.format("Failed to join multicast group %s on interface %s",

@@ -1,4 +1,8 @@
-package name.maxdeliso.teflon.data;
+package name.maxdeliso.teflon.data.test;
+
+import name.maxdeliso.teflon.data.LogicalClock;
+import name.maxdeliso.teflon.data.Message;
+import name.maxdeliso.teflon.data.MessageTracker;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Unit tests for the MessageTracker class.
  */
-class MessageTrackerTest {
+public class MessageTrackerTest {
 
     private static final String TEST_INSTANCE_ID = "550e8400-e29b-41d4-a716-446655440000";
     private static final String TEST_RECEIVER_ID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";

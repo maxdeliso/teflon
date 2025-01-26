@@ -346,7 +346,6 @@ class ConnectionDialog extends JDialog {
                     statusLabel.setText(msg);
                     LOG.error("Failed to connect", ex);
                 } finally {
-                    // 6) Hide the progress bar when done (success or failure)
                     progressBar.setVisible(false);
                 }
             }

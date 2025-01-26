@@ -197,7 +197,7 @@ public class MessageTracker {
     /**
      * Cleans up messages that have timed out.
      */
-    void cleanupTimedOutMessages() {
+    public void cleanupTimedOutMessages() {
         Instant cutoff = clock.now().minusSeconds(MESSAGE_TIMEOUT_SECONDS);
 
         messageMap.entrySet().removeIf(entry -> {

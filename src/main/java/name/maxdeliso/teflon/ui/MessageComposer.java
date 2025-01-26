@@ -15,6 +15,7 @@ import org.apache.logging.log4j.Logger;
 import name.maxdeliso.teflon.commands.CommandProcessor;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageTracker;
+import name.maxdeliso.teflon.net.NetSelector;
 
 /**
  * Panel for composing and sending messages.
@@ -70,6 +71,8 @@ public class MessageComposer extends JPanel {
      * Connection status.
      */
     private boolean connected;
+
+    private volatile NetSelector currentSelector;
 
     /**
      * Creates a new message composer.
@@ -145,7 +148,11 @@ public class MessageComposer extends JPanel {
             }
             Message message = new Message(instanceId.toString(), text);
             messageTracker.trackMessage(message);
+
             messageConsumer.accept(message);
+            if (currentSelector != null) {
+                currentSelector.wakeup();
+            }
         }
     }
 
@@ -166,24 +173,17 @@ public class MessageComposer extends JPanel {
     public void displayStatus(String[] args) {
         Map<String, Long> stats = messageTracker.getDeliveryStats();
         String connectionStatus = connected ? "Connected" : "Disconnected";
+        String statusColor = connected ? "#2E7D32" : "#C62828";
 
-        String statsInfo = String.format(
-                "Connection Status: %s\n\n" +
-                        "Message Statistics:\n" +
-                        "• Messages Sent: %d\n" +
-                        "• Acknowledgments Received: %d\n" +
-                        "• Negative Acknowledgments: %d\n" +
-                        "• Messages Timed Out: %d\n" +
-                        "• Pending Messages: %d",
-                connectionStatus,
-                stats.get("messagesSent"),
-                stats.get("acksReceived"),
-                stats.get("nacksReceived"),
-                stats.get("messagesTimedOut"),
-                stats.get("pendingMessages")
+        chatPanel.renderMessageStats(
+            statusColor,
+            connectionStatus,
+            stats.get("messagesSent"),
+            stats.get("acksReceived"),
+            stats.get("nacksReceived"),
+            stats.get("messagesTimedOut"),
+            stats.get("pendingMessages")
         );
-
-        chatPanel.renderSystemEvent("#757575", "Status Information", statsInfo);
     }
 
     /**
@@ -207,6 +207,15 @@ public class MessageComposer extends JPanel {
     }
 
     /**
+     * Updates the current NetSelector.
+     *
+     * @param selector The current NetSelector, or null if disconnected
+     */
+    public void setNetSelector(NetSelector selector) {
+        this.currentSelector = selector;
+    }
+
+    /**
      * Gets the input text field component.
      *
      * @return The input text field
@@ -215,14 +224,5 @@ public class MessageComposer extends JPanel {
         return inputTextField;
     }
 
-    /**
-     * Sets whether the input field is enabled.
-     *
-     * @param enabled Whether the input field should be enabled
-     */
-    public void setInputEnabled(boolean enabled) {
-        super.setEnabled(enabled);
-        inputTextField.setEnabled(enabled);
-        inputTextField.setEditable(enabled);
-    }
 }
+
