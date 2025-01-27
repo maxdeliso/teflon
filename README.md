@@ -108,6 +108,9 @@ mvn test
 
 ## Version History
 
+### 1.3.2
+- Add config to generate signed jars
+
 ### 1.3.1
 
 - Optimize out busy-wait in the net selector
