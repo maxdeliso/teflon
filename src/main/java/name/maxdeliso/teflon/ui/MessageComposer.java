@@ -9,9 +9,6 @@ import java.util.function.Consumer;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import name.maxdeliso.teflon.commands.CommandProcessor;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageTracker;
@@ -22,10 +19,6 @@ import name.maxdeliso.teflon.net.NetSelector;
  * Handles text input and command processing.
  */
 public class MessageComposer extends JPanel {
-    /**
-     * Logger for this class.
-     */
-    private static final Logger LOG = LogManager.getLogger(MessageComposer.class);
 
     /**
      * Default text field columns.
@@ -63,11 +56,6 @@ public class MessageComposer extends JPanel {
     private final ChatPanel chatPanel;
 
     /**
-     * Status panel for displaying status.
-     */
-    private final StatusPanel statusPanel;
-
-    /**
      * Connection status.
      */
     private boolean connected;
@@ -82,20 +70,17 @@ public class MessageComposer extends JPanel {
      * @param messageTracker   Tracker for message acknowledgments
      * @param commandProcessor Processor for handling commands
      * @param chatPanel        Chat panel for displaying messages
-     * @param statusPanel      Status panel for displaying status
      */
     public MessageComposer(UUID instanceId,
                            Consumer<Message> messageConsumer,
                            MessageTracker messageTracker,
                            CommandProcessor commandProcessor,
-                           ChatPanel chatPanel,
-                           StatusPanel statusPanel) {
+                           ChatPanel chatPanel) {
         this.instanceId = instanceId;
         this.messageConsumer = messageConsumer;
         this.messageTracker = messageTracker;
         this.commandProcessor = commandProcessor;
         this.chatPanel = chatPanel;
-        this.statusPanel = statusPanel;
         this.connected = false;
 
         setLayout(new BorderLayout());

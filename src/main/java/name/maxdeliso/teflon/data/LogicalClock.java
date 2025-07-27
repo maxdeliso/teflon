@@ -30,13 +30,4 @@ public class LogicalClock implements Clock {
     public void advanceSeconds(long seconds) {
         currentTime = currentTime.plusSeconds(seconds);
     }
-
-    /**
-     * Sets the current time to a specific instant.
-     *
-     * @param newTime The time to set
-     */
-    public void setTime(Instant newTime) {
-        this.currentTime = newTime;
-    }
 }

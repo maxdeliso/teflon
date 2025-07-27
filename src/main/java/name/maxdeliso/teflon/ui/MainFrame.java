@@ -28,6 +28,7 @@ import static name.maxdeliso.teflon.Main.MESSAGE_MARSHALLER;
 import static name.maxdeliso.teflon.Main.MULTICAST_IPV4_BIND_ADDRESS;
 import static name.maxdeliso.teflon.Main.MULTICAST_IPV6_BIND_ADDRESS;
 import static name.maxdeliso.teflon.Main.TRANSFER_QUEUE;
+
 import name.maxdeliso.teflon.commands.CommandProcessor;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageTracker;
@@ -127,10 +128,6 @@ public class MainFrame extends JFrame {
      */
     private final MessageTracker messageTracker;
     /**
-     * Command processor for handling chat commands.
-     */
-    private final CommandProcessor commandProcessor;
-    /**
      * Current connection result.
      */
     private ConnectionResult connectionResult;
@@ -164,15 +161,16 @@ public class MainFrame extends JFrame {
         // Initialize UI components first
         this.chatPanel = new ChatPanel();
         this.statusPanel = new StatusPanel();
-        this.commandProcessor = new CommandProcessor(msg -> chatPanel.renderSystemEvent("#757575", "System", msg));
+
+        CommandProcessor commandProcessor =
+                new CommandProcessor(msg -> chatPanel.renderSystemEvent("#757575", "System", msg));
         this.messageConsumer = msgConsumer;  // Use the original message consumer directly
         this.messageComposer = new MessageComposer(
                 id,
                 this.messageConsumer,
                 messageTracker,
                 commandProcessor,
-                chatPanel,
-                statusPanel
+                chatPanel
         );
         this.connectMenuItem = new JMenuItem("Connect...");
         this.disconnectMenuItem = new JMenuItem("Disconnect");

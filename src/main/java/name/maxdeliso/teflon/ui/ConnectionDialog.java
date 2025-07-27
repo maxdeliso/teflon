@@ -108,26 +108,12 @@ class ConnectionDialog extends JDialog {
             JFrame parent,
             List<NetworkInterface> interfaces,
             Consumer<ConnectionResult> connectionResultConsumer,
-            ConnectionManager connectionManager,
-            boolean isTest) {
+            ConnectionManager connectionManager) {
         super(parent, "Connect to IP Address", true);
         this.interfaces = interfaces;
         this.connectionResultConsumer = connectionResultConsumer;
         this.connectionManager = connectionManager;
-        if (!isTest) {
-            initializeComponents();
-        }
-    }
-
-    /**
-     * Main constructor for the connection dialog.
-     */
-    public ConnectionDialog(
-            JFrame parent,
-            List<NetworkInterface> interfaces,
-            Consumer<ConnectionResult> connectionResultConsumer,
-            ConnectionManager connectionManager) {
-        this(parent, interfaces, connectionResultConsumer, connectionManager, false);
+        initializeComponents();
     }
 
     /**

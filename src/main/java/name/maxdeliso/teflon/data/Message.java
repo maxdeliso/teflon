@@ -55,24 +55,6 @@ public record Message(
     }
 
     /**
-     * Creates a system event message.
-     *
-     * @param senderId     The unique identifier of the sender
-     * @param eventDetails The system event details
-     * @return A new system event message
-     */
-    public static Message createSystemEvent(String senderId, String eventDetails) {
-        return new Message(
-                senderId,
-                eventDetails,
-                UUID.randomUUID(),
-                MessageType.SYSTEM_EVENT,
-                calculateChecksum(eventDetails),
-                null
-        );
-    }
-
-    /**
      * Calculates the checksum for a message body.
      *
      * @param content The content to calculate checksum for
@@ -96,15 +78,6 @@ public record Message(
         } catch (IllegalArgumentException e) {
             return false;
         }
-    }
-
-    /**
-     * Verifies the message checksum.
-     *
-     * @return true if the checksum is valid, false otherwise
-     */
-    public boolean isValid() {
-        return calculateChecksum(body) == checksum;
     }
 
     /**
@@ -136,15 +109,6 @@ public record Message(
      */
     public boolean isAcknowledgment() {
         return type == MessageType.ACK || type == MessageType.NACK;
-    }
-
-    /**
-     * Checks if this message is a system event.
-     *
-     * @return true if the message is a system event
-     */
-    public boolean isSystemEvent() {
-        return type == MessageType.SYSTEM_EVENT;
     }
 
     /**

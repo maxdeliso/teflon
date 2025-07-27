@@ -186,15 +186,6 @@ public class MessageTracker {
     }
 
     /**
-     * Gets the ID of this tracker instance.
-     *
-     * @return The instance ID
-     */
-    public String getInstanceId() {
-        return instanceId;
-    }
-
-    /**
      * Cleans up messages that have timed out.
      */
     public void cleanupTimedOutMessages() {
