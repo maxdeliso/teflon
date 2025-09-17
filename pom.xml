@@ -4,7 +4,7 @@
 
     <groupId>name.maxdeliso</groupId>
     <artifactId>teflon</artifactId>
-    <version>1.3.3</version>
+    <version>1.3.4</version>
     <packaging>jar</packaging>
     <name>teflon</name>
     <url>https://github.com/maxdeliso/teflon</url>

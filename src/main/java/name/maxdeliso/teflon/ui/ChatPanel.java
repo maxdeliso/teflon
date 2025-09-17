@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+
 import static java.util.Objects.requireNonNull;
 
 import javax.swing.JEditorPane;
@@ -73,12 +74,25 @@ public class ChatPanel extends JPanel {
     private final DateFormat dateFormat;
 
     /**
+     * Current HTML document for efficient message appending.
+     */
+    private final Document currentDocument;
+
+    /**
      * Creates a new chat panel.
      */
     public ChatPanel() {
         setLayout(new BorderLayout());
         this.dateFormat = new SimpleDateFormat("HH:mm:ss:SS z");
         this.messagePane = createMessagePane();
+        this.currentDocument = Jsoup.parse(INITIAL_HTML);
+
+        currentDocument
+                .outputSettings()
+                .prettyPrint(false)
+                .syntax(Document.OutputSettings.Syntax.html)
+                .escapeMode(org.jsoup.nodes.Entities.EscapeMode.xhtml);
+
         add(new JScrollPane(messagePane), BorderLayout.CENTER);
     }
 
@@ -123,11 +137,11 @@ public class ChatPanel extends JPanel {
      * @param timestamp The message timestamp
      */
     public void renderMessage(String color, String senderId, String message, Date timestamp) {
-        String truncatedId = senderId.substring(0, Math.min(senderId.length(), SENDER_ID_TRUNCATE_LENGTH));
-        String colorClass = getColorStyle(color);
-        String formattedMessage = String.format(MESSAGE_TEMPLATE,
+        var truncatedId = senderId.substring(0, Math.min(senderId.length(), SENDER_ID_TRUNCATE_LENGTH));
+        var colorClass = getColorStyle(color);
+        var formattedMessage = String.format(MESSAGE_TEMPLATE,
                 colorClass,
-                senderId,   // Full sender ID for tooltip
+                senderId, // Full sender ID for tooltip
                 truncatedId,
                 dateFormat.format(timestamp),
                 message);
@@ -142,8 +156,8 @@ public class ChatPanel extends JPanel {
      * @param details The event details
      */
     public void renderSystemEvent(String color, String title, String details) {
-        String colorClass = getColorStyle(color);
-        String formattedMessage = String.format(SYSTEM_EVENT_TEMPLATE,
+        var colorClass = getColorStyle(color);
+        var formattedMessage = String.format(SYSTEM_EVENT_TEMPLATE,
                 colorClass,
                 title,
                 dateFormat.format(new Date()),
@@ -159,9 +173,9 @@ public class ChatPanel extends JPanel {
      * @param senderId  The sender's ID
      */
     public void renderAcknowledgment(String color, String messageId, String senderId) {
-        String truncatedId = senderId.substring(0, Math.min(senderId.length(), SENDER_ID_TRUNCATE_LENGTH));
-        String colorClass = getColorStyle(color);
-        String formattedMessage = String.format(ACK_TEMPLATE,
+        var truncatedId = senderId.substring(0, Math.min(senderId.length(), SENDER_ID_TRUNCATE_LENGTH));
+        var colorClass = getColorStyle(color);
+        var formattedMessage = String.format(ACK_TEMPLATE,
                 colorClass,
                 messageId,
                 truncatedId,
@@ -172,22 +186,24 @@ public class ChatPanel extends JPanel {
     /**
      * Renders message statistics.
      *
-     * @param statusColor The color to use for the status
+     * @param statusColor      The color to use for the status
      * @param connectionStatus The connection status text
-     * @param messagesSent Number of messages sent
-     * @param acksReceived Number of acknowledgments received
-     * @param nacksReceived Number of negative acknowledgments received
+     * @param messagesSent     Number of messages sent
+     * @param acksReceived     Number of acknowledgments received
+     * @param nacksReceived    Number of negative acknowledgments received
      * @param messagesTimedOut Number of messages that timed out
-     * @param pendingMessages Number of pending messages
+     * @param pendingMessages  Number of pending messages
      */
-    public void renderMessageStats(String statusColor,
-                                 String connectionStatus,
-                                 long messagesSent,
-                                 long acksReceived,
-                                 long nacksReceived,
-                                 long messagesTimedOut,
-                                 long pendingMessages) {
-        String formattedStats = String.format(STATS_TEMPLATE,
+    public void renderMessageStats(
+            String statusColor,
+            String connectionStatus,
+            long messagesSent,
+            long acksReceived,
+            long nacksReceived,
+            long messagesTimedOut,
+            long pendingMessages) {
+        var formattedStats = String.format(
+                STATS_TEMPLATE,
                 statusColor,
                 connectionStatus,
                 messagesSent,
@@ -215,24 +231,10 @@ public class ChatPanel extends JPanel {
     private void appendToMessagePane(String message) {
         SwingUtilities.invokeLater(() -> {
             try {
-                String currentContent = messagePane.getText();
-                Document currentDoc = Jsoup.parse(currentContent);
-                Document messageDoc = Jsoup.parseBodyFragment(message);
-
-                // Add the new message directly to the body
-                currentDoc
-                        .body()
-                        .appendChild(requireNonNull(messageDoc.body().children().first()));
-
-                // Configure output settings to preserve formatting
-                currentDoc
-                        .outputSettings()
-                        .prettyPrint(false)
-                        .syntax(Document.OutputSettings.Syntax.html)
-                        .escapeMode(org.jsoup.nodes.Entities.EscapeMode.xhtml);
-
-                // Update the content and scroll to bottom
-                messagePane.setText(currentDoc.html());
+                var messageDoc = Jsoup.parseBodyFragment(message);
+                var newMessageElement = requireNonNull(messageDoc.body().children().first());
+                currentDocument.body().appendChild(newMessageElement);
+                messagePane.setText(currentDocument.html());
                 messagePane.setCaretPosition(messagePane.getDocument().getLength());
             } catch (Exception e) {
                 LOG.error("Failed to append message", e);
