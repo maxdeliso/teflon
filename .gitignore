@@ -1,3 +1,8 @@
+.checkstyle
+.classpath
+.project
+.settings/
+.vscode/
 target/
 .idea/
 *.iml
