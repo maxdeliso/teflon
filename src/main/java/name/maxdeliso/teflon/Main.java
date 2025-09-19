@@ -89,9 +89,8 @@ public final class Main {
     /**
      * Application entry point.
      *
-     * @param args Command line arguments (not used)
      */
-    public static void main(final String[] args) {
+    static void main() {
         try (var netExecutor = Executors.newSingleThreadExecutor()) {
             SwingUtilities.invokeLater(() -> {
                 var mainFrame = new MainFrame(
