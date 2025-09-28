@@ -89,6 +89,8 @@ public class ConnectionManager {
             dc.setOption(StandardSocketOptions.SO_REUSEADDR, true);
             dc.setOption(StandardSocketOptions.IP_MULTICAST_IF, netIf);
             dc.setOption(StandardSocketOptions.IP_MULTICAST_TTL, 8);
+            // Enable loopback to allow multi-process testing on same machine
+            // Note: This causes self-messages to be received, requiring application-level filtering
             dc.setOption(StandardSocketOptions.IP_MULTICAST_LOOP, true);
 
             if (family == StandardProtocolFamily.INET6) {

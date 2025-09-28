@@ -405,10 +405,14 @@ public class MainFrame extends JFrame {
     public void processIncomingMessage(Message message) {
         if (message.isAcknowledgment()) {
             messageTracker.processAcknowledgment(message);
-            chatPanel.renderAcknowledgment(
-                    message.type() == Message.MessageType.ACK ? "#2E7D32" : "#C62828",
-                    message.originalMessageId().toString(),
-                    message.senderId());
+
+            // Filter out self-acknowledgments (caused by IP_MULTICAST_LOOP=true)
+            if (!message.senderId().equals(uuid.toString())) {
+                chatPanel.renderAcknowledgment(
+                        message.type() == Message.MessageType.ACK ? "#2E7D32" : "#C62828",
+                        message.originalMessageId().toString(),
+                        message.senderId());
+            }
         } else {
             messageTracker.trackMessage(message);
             chatPanel.renderMessage(
