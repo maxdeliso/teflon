@@ -3,9 +3,11 @@ package name.maxdeliso.teflon.ui;
 import java.awt.BorderLayout;
 import java.io.IOException;
 import java.net.NetworkInterface;
+import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -15,6 +17,7 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.WindowConstants;
@@ -32,6 +35,7 @@ import static name.maxdeliso.teflon.Main.TRANSFER_QUEUE;
 import name.maxdeliso.teflon.commands.CommandProcessor;
 import name.maxdeliso.teflon.data.Message;
 import name.maxdeliso.teflon.data.MessageTracker;
+import name.maxdeliso.teflon.data.PeerTracker;
 import name.maxdeliso.teflon.net.ConnectionManager;
 import name.maxdeliso.teflon.net.ConnectionResult;
 import name.maxdeliso.teflon.net.NetSelector;
@@ -85,6 +89,11 @@ public class MainFrame extends JFrame {
     private final MessageComposer messageComposer;
 
     /**
+     * Peer panel for displaying known peers.
+     */
+    private final PeerPanel peerPanel;
+
+    /**
      * Menu item for connection.
      */
     private final JMenuItem connectMenuItem;
@@ -127,6 +136,11 @@ public class MainFrame extends JFrame {
      * Message tracker for handling acknowledgments.
      */
     private final MessageTracker messageTracker;
+
+    /**
+     * Peer tracker for managing known peers.
+     */
+    private final PeerTracker peerTracker;
     /**
      * Current connection result.
      */
@@ -157,10 +171,12 @@ public class MainFrame extends JFrame {
         this.connectionManager = connManager;
         this.networkInterfaceManager = ifaceManager;
         this.messageTracker = new MessageTracker(id.toString());
+        this.peerTracker = new PeerTracker(id.toString());
 
         // Initialize UI components first
         this.chatPanel = new ChatPanel();
         this.statusPanel = new StatusPanel();
+        this.peerPanel = new PeerPanel();
 
         CommandProcessor commandProcessor =
                 new CommandProcessor(msg -> chatPanel.renderSystemEvent("#757575", "System", msg));
@@ -257,9 +273,15 @@ public class MainFrame extends JFrame {
 
         setJMenuBar(createMenuBar());
 
-        // Set up main layout
+        // Set up main layout with split pane for chat and peers
         getContentPane().setLayout(new BorderLayout());
-        getContentPane().add(chatPanel, BorderLayout.CENTER);
+
+        // Create split pane for chat (left) and peers (right)
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, chatPanel, peerPanel);
+        splitPane.setDividerLocation(600); // Set initial divider position
+        splitPane.setResizeWeight(0.7); // Chat panel gets 70% of space
+
+        getContentPane().add(splitPane, BorderLayout.CENTER);
         getContentPane().add(statusPanel, BorderLayout.SOUTH);
         getContentPane().add(messageComposer, BorderLayout.NORTH);
 
@@ -310,9 +332,9 @@ public class MainFrame extends JFrame {
                     BUFFER_LENGTH,
                     connectionResult,
                     // Incoming message handler
-                    (_address, bb) -> MESSAGE_MARSHALLER
+                    (address, bb) -> MESSAGE_MARSHALLER
                             .bufferToMessage(bb)
-                            .ifPresent(msg -> SwingUtilities.invokeLater(() -> processIncomingMessage(msg))),
+                            .ifPresent(msg -> SwingUtilities.invokeLater(() -> processIncomingMessage(msg, address))),
                     // Outgoing message source
                     new QueueMessageSource(TRANSFER_QUEUE, MESSAGE_MARSHALLER)
             );
@@ -348,6 +370,9 @@ public class MainFrame extends JFrame {
                         SwingUtilities.invokeLater(() -> {
                             currentSelector = selector;
                             messageComposer.setNetSelector(selector);
+
+                            // Reset peer tracker for new connection
+                            peerTracker.reset();
 
                             // Now that selector is set up, update UI state
                             updateConnectivityState(true);
@@ -401,8 +426,15 @@ public class MainFrame extends JFrame {
      * Process an incoming message.
      *
      * @param message The message to process
+     * @param senderAddress The sender's network address
      */
-    public void processIncomingMessage(Message message) {
+    public void processIncomingMessage(Message message, SocketAddress senderAddress) {
+        // Update peer tracker with sender information
+        peerTracker.updatePeer(message.senderId(), senderAddress);
+
+        // Update peer panel display
+        peerPanel.updatePeers(peerTracker.getPeers());
+
         if (message.isAcknowledgment()) {
             messageTracker.processAcknowledgment(message);
 
@@ -462,6 +494,10 @@ public class MainFrame extends JFrame {
                 updateConnectivityState(false);
                 messageComposer.updateConnectionStatus(false);
                 statusPanel.updateStatus(false, "disconnected");
+
+                // Reset peer tracking
+                peerTracker.reset();
+                peerPanel.updatePeers(Map.of());
 
                 // Update UI
                 connectMenuItem.setEnabled(true);
