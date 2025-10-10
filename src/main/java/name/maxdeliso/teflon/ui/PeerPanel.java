@@ -1,16 +1,26 @@
 package name.maxdeliso.teflon.ui;
 
 
-import javax.swing.*;
-import javax.swing.border.TitledBorder;
+import name.maxdeliso.teflon.data.PeerTracker;
 
-import java.awt.*;
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultListModel;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.border.TitledBorder;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Font;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.Map;
-
-import name.maxdeliso.teflon.data.PeerTracker;
 
 /**
  * Panel for displaying known peers in the network.
@@ -39,16 +49,6 @@ public class PeerPanel extends JPanel {
     private final DefaultListModel<String> peerListModel;
 
     /**
-     * List component for displaying peers.
-     */
-    private final JList<String> peerList;
-
-    /**
-     * Scroll pane for the peer list.
-     */
-    private final JScrollPane scrollPane;
-
-    /**
      * Label showing peer count.
      */
     private final JLabel peerCountLabel;
@@ -66,8 +66,8 @@ public class PeerPanel extends JPanel {
         ));
 
         this.peerListModel = new DefaultListModel<>();
-        this.peerList = createPeerList();
-        this.scrollPane = new JScrollPane(peerList);
+        JList<String> peerList = createPeerList();
+        JScrollPane scrollPane = new JScrollPane(peerList);
         this.peerCountLabel = createPeerCountLabel();
 
         // Set up layout
@@ -141,10 +141,10 @@ public class PeerPanel extends JPanel {
     /**
      * Custom cell renderer for peer list items.
      */
-    private static class PeerListCellRenderer extends DefaultListCellRenderer {
+    private static final class PeerListCellRenderer extends DefaultListCellRenderer {
         @Override
         public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                boolean isSelected, boolean cellHasFocus) {
+                                                      boolean isSelected, boolean cellHasFocus) {
             super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
 
             if (value instanceof String text) {
