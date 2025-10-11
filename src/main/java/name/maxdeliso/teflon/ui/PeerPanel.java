@@ -44,6 +44,11 @@ public class PeerPanel extends JPanel {
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     /**
+     * Font size for peer list.
+     */
+    private static final int PEER_LIST_FONT_SIZE = 12;
+
+    /**
      * List model for peer display.
      */
     private final DefaultListModel<String> peerListModel;
@@ -87,7 +92,7 @@ public class PeerPanel extends JPanel {
         JList<String> list = new JList<>(peerListModel);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new PeerListCellRenderer());
-        list.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        list.setFont(new Font(Font.MONOSPACED, Font.PLAIN, PEER_LIST_FONT_SIZE));
         return list;
     }
 

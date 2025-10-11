@@ -68,6 +68,16 @@ public class MainFrame extends JFrame {
     private static final String WINDOW_TITLE = "Teflon";
 
     /**
+     * Initial divider position for split pane.
+     */
+    private static final int INITIAL_DIVIDER_POSITION = 600;
+
+    /**
+     * Resize weight for chat panel in split pane.
+     */
+    private static final double CHAT_PANEL_RESIZE_WEIGHT = 0.7;
+
+    /**
      * Application icon image.
      */
     private static final java.awt.image.BufferedImage APP_ICON =
@@ -278,8 +288,8 @@ public class MainFrame extends JFrame {
 
         // Create split pane for chat (left) and peers (right)
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, chatPanel, peerPanel);
-        splitPane.setDividerLocation(600); // Set initial divider position
-        splitPane.setResizeWeight(0.7); // Chat panel gets 70% of space
+        splitPane.setDividerLocation(INITIAL_DIVIDER_POSITION); // Set initial divider position
+        splitPane.setResizeWeight(CHAT_PANEL_RESIZE_WEIGHT); // Chat panel gets 70% of space
 
         getContentPane().add(splitPane, BorderLayout.CENTER);
         getContentPane().add(statusPanel, BorderLayout.SOUTH);
