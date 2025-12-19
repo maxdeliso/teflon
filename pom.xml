@@ -11,7 +11,7 @@
 
     <properties>
         <java.version>25</java.version>
-        <log4j.version>2.25.1</log4j.version>
+        <log4j.version>2.25.3</log4j.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <junit.jupiter.execution.timeout.default>10s</junit.jupiter.execution.timeout.default>
